@@ -4,23 +4,20 @@ This document tracks outstanding issues, missing features, and improvements need
 
 ## Critical Issues
 
-### 1. Duplicate Private Key Loading
+### 1. Duplicate Private Key Loading ✅ FIXED
 **Location:** `pkg/webhook/pod_handler.go`
-**Issue:** Private key is loaded twice - once in `NewPodHandler` (line 44) and again in `Handle` (line 92). The key should be stored in the struct.
-**Impact:** Redundant code, potential inconsistency
-**Priority:** Medium
+**Status:** Fixed - Private key is now stored in PodHandler struct
+**Fixed in:** commit fcfaf56
 
-### 2. AllowedSubjects Validation Not Implemented
+### 2. AllowedSubjects Validation Not Implemented ✅ FIXED
 **Location:** `pkg/webhook/pod_handler.go`
-**Issue:** The `AllowedSubjects` field in ZenLockSpec is defined but never validated. The webhook should check if the Pod's ServiceAccount is allowed to use the secret.
-**Impact:** Security feature not enforced
-**Priority:** High
+**Status:** Fixed - Added `validateAllowedSubjects` function that checks Pod ServiceAccount against allowed subjects
+**Fixed in:** commit fcfaf56
 
-### 3. Missing LastTransitionTime in Conditions
+### 3. Missing LastTransitionTime in Conditions ✅ FIXED
 **Location:** `pkg/controller/reconciler.go`
-**Issue:** When updating conditions, `LastTransitionTime` is not set, making it hard to track when conditions changed.
-**Impact:** Reduced observability
-**Priority:** Low
+**Status:** Fixed - LastTransitionTime is now properly set and updated when condition status changes
+**Fixed in:** commit fcfaf56
 
 ## Missing Features
 
@@ -45,15 +42,15 @@ This document tracks outstanding issues, missing features, and improvements need
 
 ## Code Quality
 
-### 7. Error Handling for Secret Already Exists
+### 7. Error Handling for Secret Already Exists ✅ FIXED
 **Location:** `pkg/webhook/pod_handler.go:135`
-**Issue:** Using string matching on error message is fragile. Should use `k8serrors.IsAlreadyExists(err)`.
-**Priority:** Low
+**Status:** Fixed - Now uses `k8serrors.IsAlreadyExists(err)` for proper error checking
+**Fixed in:** commit fcfaf56
 
-### 8. Missing Context Timeout
+### 8. Missing Context Timeout ✅ FIXED
 **Location:** `pkg/webhook/pod_handler.go`
-**Issue:** No timeout context for API calls, could hang indefinitely.
-**Priority:** Medium
+**Status:** Fixed - Added 10 second timeout context to webhook handler
+**Fixed in:** commit fcfaf56
 
 ## Documentation
 
@@ -107,12 +104,12 @@ This document tracks outstanding issues, missing features, and improvements need
 **Priority:** Low
 **Description:** Ensure the public key used matches the cluster's key.
 
-## Quick Wins (Can be fixed immediately)
+## Quick Wins (Can be fixed immediately) ✅ ALL COMPLETED
 
-1. Fix duplicate private key loading
-2. Use proper error checking for `IsAlreadyExists`
-3. Add `LastTransitionTime` to conditions
-4. Add context timeout to webhook handler
+1. ✅ Fix duplicate private key loading
+2. ✅ Use proper error checking for `IsAlreadyExists`
+3. ✅ Add `LastTransitionTime` to conditions
+4. ✅ Add context timeout to webhook handler
 
 ## Next Steps
 
