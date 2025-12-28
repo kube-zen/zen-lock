@@ -20,52 +20,155 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"filippo.io/age"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/controller"
+	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
 )
 
 var (
 	testEnv   *envtest.Environment
 	k8sClient client.Client
+	scheme    = runtime.NewScheme()
+	testCtx   context.Context
+	cancel    context.CancelFunc
 )
 
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
+}
+
 func TestMain(m *testing.M) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
 	// Setup test environment
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{"../../config/crd/bases"},
 		ErrorIfCRDPathMissing: true,
+		WebhookInstallOptions: envtest.WebhookInstallOptions{
+			Paths: []string{"../../config/webhook"},
+		},
 	}
 
 	cfg, err := testEnv.Start()
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to start test environment: %v", err))
 	}
 
-	// Create client
-	k8sClient, err = client.New(cfg, client.Options{})
+	// Create manager with webhook server
+	testCtx, cancel = context.WithCancel(context.Background())
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics server for tests
+		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+			Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+			CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+		}),
+		LeaderElection: false,
+	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to create manager: %v", err))
+	}
+
+	// Setup controller
+	reconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create reconciler: %v", err))
+	}
+	if err := reconciler.SetupWithManager(mgr); err != nil {
+		panic(fmt.Sprintf("Failed to setup controller: %v", err))
+	}
+
+	// Setup webhook
+	if err := webhookpkg.SetupWebhookWithManager(mgr); err != nil {
+		panic(fmt.Sprintf("Failed to setup webhook: %v", err))
+	}
+
+	// Start manager in background
+	go func() {
+		if err := mgr.Start(testCtx); err != nil {
+			panic(fmt.Sprintf("Failed to start manager: %v", err))
+		}
+	}()
+
+	// Wait for manager to be ready
+	time.Sleep(2 * time.Second)
+
+	// Create client
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create client: %v", err))
 	}
 
 	// Run tests
 	code := m.Run()
 
 	// Cleanup
+	cancel()
 	if err := testEnv.Stop(); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to stop test environment: %v", err))
 	}
 
 	os.Exit(code)
+}
+
+// generateTestKeys generates a test key pair for E2E tests
+func generateTestKeys(t *testing.T) (privateKey, publicKey string) {
+	identity, err := age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatalf("Failed to generate test identity: %v", err)
+	}
+	return identity.String(), identity.Recipient().String()
+}
+
+// encryptTestData encrypts test data using the provided public key
+func encryptTestData(t *testing.T, plaintext string, publicKey string) string {
+	recipient, err := age.ParseX25519Recipient(publicKey)
+	if err != nil {
+		t.Fatalf("Failed to parse recipient: %v", err)
+	}
+
+	var encrypted bytes.Buffer
+	w, err := age.Encrypt(&encrypted, recipient)
+	if err != nil {
+		t.Fatalf("Failed to create encrypt writer: %v", err)
+	}
+
+	if _, err := w.Write([]byte(plaintext)); err != nil {
+		t.Fatalf("Failed to write plaintext: %v", err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("Failed to close encrypt writer: %v", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(encrypted.Bytes())
 }
 
 func TestZenLockCRD_Exists(t *testing.T) {
@@ -87,6 +190,9 @@ func TestZenLockCRUD_E2E(t *testing.T) {
 	ctx := context.Background()
 	namespace := "default"
 
+	privateKey, publicKey := generateTestKeys(t)
+	encryptedValue := encryptTestData(t, "test-value", publicKey)
+
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "e2e-test-secret",
@@ -94,12 +200,15 @@ func TestZenLockCRUD_E2E(t *testing.T) {
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
 			EncryptedData: map[string]string{
-				"key1": "encrypted-value-1",
-				"key2": "encrypted-value-2",
+				"key1": encryptedValue,
 			},
 			Algorithm: "age",
 		},
 	}
+
+	// Set private key for controller
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
+	defer os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
 
 	// Create
 	if err := k8sClient.Create(ctx, zenlock); err != nil {
@@ -109,6 +218,9 @@ func TestZenLockCRUD_E2E(t *testing.T) {
 		k8sClient.Delete(ctx, zenlock)
 	}()
 
+	// Wait for controller to reconcile
+	time.Sleep(2 * time.Second)
+
 	// Read
 	retrieved := &securityv1alpha1.ZenLock{}
 	nn := types.NamespacedName{Name: "e2e-test-secret", Namespace: namespace}
@@ -116,12 +228,13 @@ func TestZenLockCRUD_E2E(t *testing.T) {
 		t.Fatalf("Failed to get ZenLock: %v", err)
 	}
 
-	if len(retrieved.Spec.EncryptedData) != 2 {
-		t.Errorf("Expected 2 encrypted keys, got %d", len(retrieved.Spec.EncryptedData))
+	if len(retrieved.Spec.EncryptedData) != 1 {
+		t.Errorf("Expected 1 encrypted key, got %d", len(retrieved.Spec.EncryptedData))
 	}
 
 	// Update
-	retrieved.Spec.EncryptedData["key3"] = "encrypted-value-3"
+	encryptedValue2 := encryptTestData(t, "test-value-2", publicKey)
+	retrieved.Spec.EncryptedData["key2"] = encryptedValue2
 	if err := k8sClient.Update(ctx, retrieved); err != nil {
 		t.Fatalf("Failed to update ZenLock: %v", err)
 	}
@@ -132,8 +245,8 @@ func TestZenLockCRUD_E2E(t *testing.T) {
 		t.Fatalf("Failed to get updated ZenLock: %v", err)
 	}
 
-	if len(updated.Spec.EncryptedData) != 3 {
-		t.Errorf("Expected 3 encrypted keys after update, got %d", len(updated.Spec.EncryptedData))
+	if len(updated.Spec.EncryptedData) != 2 {
+		t.Errorf("Expected 2 encrypted keys after update, got %d", len(updated.Spec.EncryptedData))
 	}
 
 	// Delete
@@ -148,6 +261,62 @@ func TestZenLockCRUD_E2E(t *testing.T) {
 	}
 }
 
+func TestZenLockController_Reconciliation(t *testing.T) {
+	ctx := context.Background()
+	namespace := "default"
+
+	privateKey, publicKey := generateTestKeys(t)
+	encryptedValue := encryptTestData(t, "test-value", publicKey)
+
+	zenlock := &securityv1alpha1.ZenLock{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "e2e-reconcile-test",
+			Namespace: namespace,
+		},
+		Spec: securityv1alpha1.ZenLockSpec{
+			EncryptedData: map[string]string{
+				"TEST_KEY": encryptedValue,
+			},
+			Algorithm: "age",
+		},
+	}
+
+	// Set private key for controller
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
+	defer os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+
+	// Create ZenLock
+	if err := k8sClient.Create(ctx, zenlock); err != nil {
+		t.Fatalf("Failed to create ZenLock: %v", err)
+	}
+	defer func() {
+		k8sClient.Delete(ctx, zenlock)
+	}()
+
+	// Wait for controller to reconcile
+	time.Sleep(3 * time.Second)
+
+	// Verify status was updated
+	retrieved := &securityv1alpha1.ZenLock{}
+	nn := types.NamespacedName{Name: "e2e-reconcile-test", Namespace: namespace}
+	if err := k8sClient.Get(ctx, nn, retrieved); err != nil {
+		t.Fatalf("Failed to get ZenLock: %v", err)
+	}
+
+	// Check that status has been updated
+	if retrieved.Status.Phase == "" {
+		t.Error("Expected Phase to be set by controller")
+	}
+
+	// Check conditions
+	readyCondition := findCondition(retrieved.Status.Conditions, "Ready")
+	if readyCondition == nil {
+		t.Error("Expected Ready condition to be set")
+	} else if readyCondition.Status != "True" {
+		t.Errorf("Expected Ready condition to be True, got %s", readyCondition.Status)
+	}
+}
+
 func TestPodInjection_E2E(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping E2E test in short mode")
@@ -155,6 +324,13 @@ func TestPodInjection_E2E(t *testing.T) {
 
 	ctx := context.Background()
 	namespace := "default"
+
+	privateKey, publicKey := generateTestKeys(t)
+	encryptedValue := encryptTestData(t, "test-secret-value", publicKey)
+
+	// Set private key for webhook and controller
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
+	defer os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
 
 	// Create ZenLock
 	zenlock := &securityv1alpha1.ZenLock{
@@ -164,8 +340,9 @@ func TestPodInjection_E2E(t *testing.T) {
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
 			EncryptedData: map[string]string{
-				"TEST_KEY": "dGVzdC12YWx1ZQ==", // base64 encoded
+				"TEST_KEY": encryptedValue,
 			},
+			Algorithm: "age",
 		},
 	}
 
@@ -175,6 +352,9 @@ func TestPodInjection_E2E(t *testing.T) {
 	defer func() {
 		k8sClient.Delete(ctx, zenlock)
 	}()
+
+	// Wait for controller to reconcile
+	time.Sleep(2 * time.Second)
 
 	// Create Pod with injection annotation
 	pod := &corev1.Pod{
@@ -197,14 +377,91 @@ func TestPodInjection_E2E(t *testing.T) {
 		},
 	}
 
-	// Note: This test requires a running webhook server
-	// In a real E2E test, you would:
-	// 1. Deploy the webhook server
-	// 2. Create the Pod
-	// 3. Verify the secret was injected
-	// 4. Verify the Pod can read the secret
+	// Create Pod - webhook should mutate it
+	if err := k8sClient.Create(ctx, pod); err != nil {
+		t.Fatalf("Failed to create Pod: %v", err)
+	}
+	defer func() {
+		k8sClient.Delete(ctx, pod)
+	}()
 
-	t.Skip("E2E test requires running webhook server - implement with test environment setup")
+	// Wait for webhook to process
+	time.Sleep(2 * time.Second)
+
+	// Verify Pod was mutated
+	retrievedPod := &corev1.Pod{}
+	nn := types.NamespacedName{Name: "e2e-test-pod", Namespace: namespace}
+	if err := k8sClient.Get(ctx, nn, retrievedPod); err != nil {
+		t.Fatalf("Failed to get Pod: %v", err)
+	}
+
+	// Check that volume was added
+	foundVolume := false
+	for _, vol := range retrievedPod.Spec.Volumes {
+		if vol.Name == "zen-lock-e2e-injection-test" {
+			foundVolume = true
+			if vol.Secret == nil {
+				t.Error("Expected volume to reference a Secret")
+			} else if vol.Secret.SecretName != "zen-lock-e2e-injection-test" {
+				t.Errorf("Expected secret name 'zen-lock-e2e-injection-test', got '%s'", vol.Secret.SecretName)
+			}
+			break
+		}
+	}
+	if !foundVolume {
+		t.Error("Expected Pod to have zen-lock volume injected")
+	}
+
+	// Check that volume mount was added
+	foundMount := false
+	for _, container := range retrievedPod.Spec.Containers {
+		for _, mount := range container.VolumeMounts {
+			if mount.Name == "zen-lock-e2e-injection-test" {
+				foundMount = true
+				if mount.MountPath != "/zen-lock/secrets" {
+					t.Errorf("Expected mount path '/zen-lock/secrets', got '%s'", mount.MountPath)
+				}
+				break
+			}
+		}
+	}
+	if !foundMount {
+		t.Error("Expected Pod to have zen-lock volume mount injected")
+	}
+
+	// Verify ephemeral Secret was created
+	secret := &corev1.Secret{}
+	secretNN := types.NamespacedName{Name: "zen-lock-e2e-injection-test", Namespace: namespace}
+	if err := k8sClient.Get(ctx, secretNN, secret); err != nil {
+		t.Fatalf("Failed to get ephemeral Secret: %v", err)
+	}
+
+	// Verify Secret has OwnerReference to Pod
+	if len(secret.OwnerReferences) == 0 {
+		t.Error("Expected Secret to have OwnerReference to Pod")
+	} else {
+		ownerRef := secret.OwnerReferences[0]
+		if ownerRef.Kind != "Pod" {
+			t.Errorf("Expected OwnerReference kind 'Pod', got '%s'", ownerRef.Kind)
+		}
+		if ownerRef.Name != "e2e-test-pod" {
+			t.Errorf("Expected OwnerReference name 'e2e-test-pod', got '%s'", ownerRef.Name)
+		}
+	}
+
+	// Verify Secret contains decrypted data
+	if secret.Data == nil {
+		t.Error("Expected Secret to have data")
+	} else {
+		if _, exists := secret.Data["TEST_KEY"]; !exists {
+			t.Error("Expected Secret to contain TEST_KEY")
+		} else {
+			decryptedValue := string(secret.Data["TEST_KEY"])
+			if decryptedValue != "test-secret-value" {
+				t.Errorf("Expected decrypted value 'test-secret-value', got '%s'", decryptedValue)
+			}
+		}
+	}
 }
 
 func TestAllowedSubjects_E2E(t *testing.T) {
@@ -214,6 +471,13 @@ func TestAllowedSubjects_E2E(t *testing.T) {
 
 	ctx := context.Background()
 	namespace := "default"
+
+	privateKey, publicKey := generateTestKeys(t)
+	encryptedValue := encryptTestData(t, "test-value", publicKey)
+
+	// Set private key for webhook and controller
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
+	defer os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
 
 	// Create ServiceAccount
 	sa := &corev1.ServiceAccount{
@@ -238,8 +502,9 @@ func TestAllowedSubjects_E2E(t *testing.T) {
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
 			EncryptedData: map[string]string{
-				"key1": "value1",
+				"key1": encryptedValue,
 			},
+			Algorithm: "age",
 			AllowedSubjects: []securityv1alpha1.SubjectReference{
 				{
 					Kind:      "ServiceAccount",
@@ -257,32 +522,163 @@ func TestAllowedSubjects_E2E(t *testing.T) {
 		k8sClient.Delete(ctx, zenlock)
 	}()
 
-	// Verify ZenLock was created with AllowedSubjects
+	// Wait for controller to reconcile
+	time.Sleep(2 * time.Second)
+
+	// Create Pod with allowed ServiceAccount
+	allowedPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "e2e-allowed-pod",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"zen-lock/inject": "e2e-allowed-subjects-test",
+			},
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "e2e-test-sa",
+			Containers: []corev1.Container{
+				{
+					Name:    "test-container",
+					Image:   "busybox:latest",
+					Command: []string{"sleep", "3600"},
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
+	}
+
+	// Create Pod - should succeed
+	if err := k8sClient.Create(ctx, allowedPod); err != nil {
+		t.Fatalf("Failed to create allowed Pod: %v", err)
+	}
+	defer func() {
+		k8sClient.Delete(ctx, allowedPod)
+	}()
+
+	// Wait for webhook to process
+	time.Sleep(2 * time.Second)
+
+	// Verify Pod was mutated (injection succeeded)
+	retrievedPod := &corev1.Pod{}
+	nn := types.NamespacedName{Name: "e2e-allowed-pod", Namespace: namespace}
+	if err := k8sClient.Get(ctx, nn, retrievedPod); err != nil {
+		t.Fatalf("Failed to get Pod: %v", err)
+	}
+
+	// Check that volume was added (injection succeeded)
+	foundVolume := false
+	for _, vol := range retrievedPod.Spec.Volumes {
+		if vol.Name == "zen-lock-e2e-allowed-subjects-test" {
+			foundVolume = true
+			break
+		}
+	}
+	if !foundVolume {
+		t.Error("Expected Pod to have zen-lock volume injected (allowed ServiceAccount)")
+	}
+
+	// Create Pod with disallowed ServiceAccount
+	disallowedPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "e2e-disallowed-pod",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"zen-lock/inject": "e2e-allowed-subjects-test",
+			},
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "default", // Not in AllowedSubjects
+			Containers: []corev1.Container{
+				{
+					Name:    "test-container",
+					Image:   "busybox:latest",
+					Command: []string{"sleep", "3600"},
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
+	}
+
+	// Create Pod - should fail (webhook should deny)
+	if err := k8sClient.Create(ctx, disallowedPod); err == nil {
+		// If creation succeeded, verify Pod was NOT mutated
+		defer func() {
+			k8sClient.Delete(ctx, disallowedPod)
+		}()
+
+		time.Sleep(2 * time.Second)
+
+		retrievedDisallowedPod := &corev1.Pod{}
+		disallowedNN := types.NamespacedName{Name: "e2e-disallowed-pod", Namespace: namespace}
+		if err := k8sClient.Get(ctx, disallowedNN, retrievedDisallowedPod); err == nil {
+			// Check that volume was NOT added (injection failed)
+			for _, vol := range retrievedDisallowedPod.Spec.Volumes {
+				if vol.Name == "zen-lock-e2e-allowed-subjects-test" {
+					t.Error("Expected Pod to NOT have zen-lock volume injected (disallowed ServiceAccount)")
+					break
+				}
+			}
+		}
+	} else {
+		// Expected: webhook denied the request
+		t.Logf("Pod creation denied as expected: %v", err)
+	}
+}
+
+func TestZenLock_InvalidCiphertext(t *testing.T) {
+	ctx := context.Background()
+	namespace := "default"
+
+	privateKey, _ := generateTestKeys(t)
+
+	// Set private key for controller
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
+	defer os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+
+	// Create ZenLock with invalid ciphertext
+	zenlock := &securityv1alpha1.ZenLock{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "e2e-invalid-ciphertext",
+			Namespace: namespace,
+		},
+		Spec: securityv1alpha1.ZenLockSpec{
+			EncryptedData: map[string]string{
+				"key1": "invalid-ciphertext",
+			},
+			Algorithm: "age",
+		},
+	}
+
+	if err := k8sClient.Create(ctx, zenlock); err != nil {
+		t.Fatalf("Failed to create ZenLock: %v", err)
+	}
+	defer func() {
+		k8sClient.Delete(ctx, zenlock)
+	}()
+
+	// Wait for controller to reconcile
+	time.Sleep(3 * time.Second)
+
+	// Verify status shows error
 	retrieved := &securityv1alpha1.ZenLock{}
-	nn := types.NamespacedName{Name: "e2e-allowed-subjects-test", Namespace: namespace}
+	nn := types.NamespacedName{Name: "e2e-invalid-ciphertext", Namespace: namespace}
 	if err := k8sClient.Get(ctx, nn, retrieved); err != nil {
 		t.Fatalf("Failed to get ZenLock: %v", err)
 	}
 
-	if len(retrieved.Spec.AllowedSubjects) != 1 {
-		t.Errorf("Expected 1 allowed subject, got %d", len(retrieved.Spec.AllowedSubjects))
+	// Check that status reflects error
+	errorCondition := findCondition(retrieved.Status.Conditions, "Ready")
+	if errorCondition != nil && errorCondition.Status == "True" {
+		t.Error("Expected Ready condition to be False for invalid ciphertext")
 	}
-
-	if retrieved.Spec.AllowedSubjects[0].Name != "e2e-test-sa" {
-		t.Errorf("Expected ServiceAccount name 'e2e-test-sa', got '%s'", retrieved.Spec.AllowedSubjects[0].Name)
-	}
-
-	t.Skip("E2E test requires running webhook server to test actual validation")
 }
 
-// Helper function to wait for resource
-func waitForResource(ctx context.Context, client client.Client, obj client.Object, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if err := client.Get(ctx, client.ObjectKeyFromObject(obj), obj); err == nil {
-			return nil
+// Helper function to find a condition by type
+func findCondition(conditions []securityv1alpha1.ZenLockCondition, conditionType string) *securityv1alpha1.ZenLockCondition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return &conditions[i]
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
-	return context.DeadlineExceeded
+	return nil
 }

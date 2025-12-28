@@ -21,10 +21,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -68,7 +68,7 @@ func TestPodHandler_Handle_NoInjectionAnnotation(t *testing.T) {
 	podRaw, _ := json.Marshal(pod)
 	req := admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
-			Object:    runtime.RawExtension{Raw: podRaw},
+			Object: runtime.RawExtension{Raw: podRaw},
 			Namespace: "default",
 		},
 	}
@@ -86,10 +86,10 @@ func TestValidateAllowedSubjects(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name            string
-		pod             *corev1.Pod
+		name           string
+		pod            *corev1.Pod
 		allowedSubjects []securityv1alpha1.SubjectReference
-		wantErr         bool
+		wantErr        bool
 	}{
 		{
 			name: "allowed ServiceAccount",
@@ -164,11 +164,11 @@ func TestCreatePatch(t *testing.T) {
 	handler, _ := setupTestPodHandler(t)
 
 	tests := []struct {
-		name       string
-		pod        *corev1.Pod
+		name      string
+		pod       *corev1.Pod
 		secretName string
-		mountPath  string
-		wantErr    bool
+		mountPath string
+		wantErr   bool
 	}{
 		{
 			name: "pod with no volumes",
@@ -243,3 +243,4 @@ func TestCreatePatch(t *testing.T) {
 		})
 	}
 }
+

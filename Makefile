@@ -68,11 +68,18 @@ test-integration:
 	@echo "Running integration tests..."
 	go test -v -timeout=5m ./test/integration/...
 
-# Run E2E tests (requires Kubernetes cluster)
+# Run E2E tests (requires kubebuilder binaries)
+# Install kubebuilder: https://kubebuilder.io/docs/getting-started/installation/
 test-e2e:
 	@echo "Running E2E tests..."
 	@if [ -z "$$(go list -f '{{.Dir}}' -m sigs.k8s.io/controller-runtime 2>/dev/null)" ]; then \
 		echo "⚠️  E2E tests require envtest. Install: go get sigs.k8s.io/controller-runtime/pkg/envtest"; \
+		exit 1; \
+	fi
+	@if ! command -v kubebuilder >/dev/null 2>&1 && [ ! -d "/usr/local/kubebuilder" ]; then \
+		echo "⚠️  E2E tests require kubebuilder binaries."; \
+		echo "   Install: https://kubebuilder.io/docs/getting-started/installation/"; \
+		echo "   Or set KUBEBUILDER_ASSETS environment variable"; \
 		exit 1; \
 	fi
 	go test -v -tags=e2e -timeout=30m ./test/e2e/...
