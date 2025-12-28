@@ -40,4 +40,3 @@ func TestAgeEncryptor_DecryptMap(t *testing.T) {
 	// Integration tests should cover this
 	t.Skip("Requires actual encrypted data - covered in integration tests")
 }
-
