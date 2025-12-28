@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zen-lock-webhook
+  namespace: zen-lock-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zen-lock-manager
+  annotations:
+    rbac.authorization.k8s.io/justification: "Controller watches ZenLocks and updates their status. Webhook reads ZenLocks and creates ephemeral Secrets for Pods."
+rules:
+  # ZenLock CRD: Full access
+  - apiGroups: ["security.zen.io"]
+    resources: ["zenlocks"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["security.zen.io"]
+    resources: ["zenlocks/status"]
+    verbs: ["get", "update", "patch"]
+  # Secrets: Create and read (for ephemeral secrets)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create"]
+  # Pods: Read access (for webhook injection)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Events: Create (for event recording)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+  # Leases: Full access (for leader election)
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zen-lock-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zen-lock-manager
+subjects:
+  - kind: ServiceAccount
+    name: zen-lock-webhook
+    namespace: zen-lock-system
+

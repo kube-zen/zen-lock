@@ -1,0 +1,258 @@
+# zen-lock
+
+zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge secret storage. It ensures your secrets are never stored in plaintext in etcd and never visible via kubectl.
+
+## Features
+
+- **Zero-Knowledge**: Secrets are ciphertext in etcd. The API server cannot read them.
+- **Ephemeral Lifecycle**: Decrypted secrets exist only for the lifetime of the Pod.
+- **GitOps Ready**: Encrypted manifests can be safely committed to Git.
+- **Kubernetes-Native**: Uses standard CRDs and Mutating Webhooks. No external databases.
+- **Age Encryption**: Uses modern, easy-to-use encryption (age) by default.
+
+## Quick Start
+
+### 1. Generate Keys
+
+```bash
+zen-lock keygen --output private-key.age
+```
+
+This creates a private key file and displays the public key.
+
+### 2. Export Public Key
+
+```bash
+zen-lock pubkey --input private-key.age > public-key.age
+```
+
+Share `public-key.age` with your team.
+
+### 3. Encrypt a Secret
+
+Create a file `secret.yaml`:
+
+```yaml
+metadata:
+  name: db-credentials
+stringData:
+  DB_USER: "admin"
+  DB_PASS: "SuperSecret123!"
+```
+
+Encrypt it:
+
+```bash
+zen-lock encrypt --pubkey $(cat public-key.age) --input secret.yaml --output encrypted-secret.yaml
+```
+
+### 4. Deploy to Cluster
+
+```bash
+kubectl apply -f encrypted-secret.yaml
+```
+
+### 5. Inject into Pod
+
+Create a deployment with the injection annotation:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    metadata:
+      annotations:
+        zen-lock/inject: "db-credentials"
+        zen-lock/mount-path: "/etc/config"
+    spec:
+      containers:
+      - name: app
+        image: nginx
+        volumeMounts:
+        - name: zen-secrets
+          mountPath: /etc/config
+```
+
+## Installation
+
+### CLI
+
+**macOS (Homebrew):**
+```bash
+brew tap kube-zen/tap
+brew install zen-lock
+```
+
+**Linux:**
+```bash
+curl -sSL https://raw.githubusercontent.com/kube-zen/zen-lock/main/install.sh | bash
+```
+
+**From Source:**
+```bash
+git clone https://github.com/kube-zen/zen-lock.git
+cd zen-lock
+make build-cli
+sudo mv bin/zen-lock /usr/local/bin/
+```
+
+### Controller
+
+**Using kubectl:**
+```bash
+kubectl apply -f config/crd/bases/
+kubectl apply -f config/rbac/
+kubectl apply -f config/webhook/
+```
+
+**Using Helm:**
+```bash
+helm repo add zen-lock https://kube-zen.github.io/zen-lock
+helm repo update
+helm install zen-lock zen-lock/zen-lock --namespace zen-lock-system --create-namespace
+```
+
+## Configuration
+
+The controller needs access to the Private Key to decrypt secrets.
+
+**Option A: Environment Variable (Basic)**
+Edit the Deployment to add the private key:
+
+```yaml
+env:
+  - name: ZEN_LOCK_PRIVATE_KEY
+    valueFrom:
+      secretKeyRef:
+        name: zen-lock-master-key
+        key: key.txt
+```
+
+**Option B: AWS KMS (Planned)**
+Set the `--kms-key-id` flag in the controller arguments.
+
+## CLI Reference
+
+### `zen-lock keygen`
+Generates a new encryption key pair.
+
+```bash
+zen-lock keygen --output ~/.zen-lock/key.age
+```
+
+### `zen-lock pubkey`
+Extracts the public key from a private key file.
+
+```bash
+zen-lock pubkey --input ~/.zen-lock/key.age > pubkey.txt
+```
+
+### `zen-lock encrypt`
+Encrypts a YAML file containing secret data.
+
+```bash
+zen-lock encrypt \
+  --pubkey age1q3... \
+  --input plain-secret.yaml \
+  --output encrypted-zenlock.yaml
+```
+
+### `zen-lock decrypt`
+Decrypts a ZenLock CRD file back to plain text (debug only).
+
+```bash
+zen-lock decrypt \
+  --privkey ~/.zen-lock/key.age \
+  --input encrypted-zenlock.yaml \
+  --output plain-secret.yaml
+```
+
+## API Reference
+
+### ZenLock CRD
+
+```yaml
+apiVersion: security.zen.io/v1alpha1
+kind: ZenLock
+metadata:
+  name: example-secret
+  namespace: production
+spec:
+  encryptedData:
+    USERNAME: <ciphertext>
+    API_KEY: <ciphertext>
+  algorithm: age
+  allowedSubjects:
+  - kind: ServiceAccount
+    name: backend-app
+    namespace: production
+```
+
+## Development
+
+### Building
+
+```bash
+# Build CLI
+make build-cli
+
+# Build Controller
+make build-controller
+
+# Build Docker Image
+make build-image
+```
+
+### Running Locally
+
+```bash
+# Set private key
+export ZEN_LOCK_PRIVATE_KEY=$(cat private-key.age)
+
+# Run webhook locally
+make run
+```
+
+## Security Model
+
+zen-lock implements Zero-Knowledge encryption:
+
+- **At Rest**: The ZenLock CRD stored in etcd contains only unreadable ciphertext.
+- **In Transit**: Encryption happens on the developer's machine.
+- **In Memory**: The decrypted value exists only as a standard Kubernetes Secret mounted into the Pod.
+- **Auto-Cleanup**: By setting the OwnerReference of the decrypted secret to the Pod, Kubernetes guarantees that the secret is deleted when the Pod is removed.
+
+## Troubleshooting
+
+### Pod is stuck in ContainerCreating
+
+Check webhook logs:
+```bash
+kubectl logs -n zen-lock-system deployment/zen-lock-webhook
+```
+
+Verify private key is set:
+```bash
+kubectl get deployment zen-lock-webhook -n zen-lock-system -o yaml | grep ZEN_LOCK_PRIVATE_KEY
+```
+
+### Changes not reflected in running Pods
+
+Secrets are injected at Pod creation time. You must delete and recreate the Pod to get updated secrets.
+
+## Contributing
+
+We welcome contributions! Please see CONTRIBUTING.md for details.
+
+## License
+
+Apache License 2.0
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/kube-zen/zen-lock/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kube-zen/zen-lock/discussions)
+

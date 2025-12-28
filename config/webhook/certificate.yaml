@@ -1,0 +1,23 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zen-lock-webhook-cert
+  namespace: zen-lock-system
+spec:
+  secretName: zen-lock-webhook-cert
+  issuerRef:
+    name: zen-lock-selfsigned-issuer
+    kind: Issuer
+  dnsNames:
+  - zen-lock-webhook
+  - zen-lock-webhook.zen-lock-system
+  - zen-lock-webhook.zen-lock-system.svc
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: zen-lock-selfsigned-issuer
+  namespace: zen-lock-system
+spec:
+  selfSigned: {}
+
