@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,28 +80,42 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv1alpha1.ZenLock, phase, reason, message string) {
 	zenlock.Status.Phase = phase
 
+	now := metav1.Now()
+	conditionStatus := "True"
+	if phase == "Error" {
+		conditionStatus = "False"
+	}
+
 	// Update or create condition
 	condition := securityv1alpha1.ZenLockCondition{
 		Type:    "Decryptable",
-		Status:  "True",
+		Status:  conditionStatus,
 		Reason:  reason,
 		Message: message,
 	}
 
-	if phase == "Error" {
-		condition.Status = "False"
-	}
-
-	// Find existing condition or add new one
+	// Find existing condition
 	found := false
+	var existingIndex int
 	for i, c := range zenlock.Status.Conditions {
 		if c.Type == condition.Type {
-			zenlock.Status.Conditions[i] = condition
+			existingIndex = i
 			found = true
+			// Only update LastTransitionTime if status changed
+			if c.Status != condition.Status {
+				condition.LastTransitionTime = &now
+			} else {
+				condition.LastTransitionTime = c.LastTransitionTime
+			}
 			break
 		}
 	}
-	if !found {
+
+	if found {
+		zenlock.Status.Conditions[existingIndex] = condition
+	} else {
+		// New condition - set transition time
+		condition.LastTransitionTime = &now
 		zenlock.Status.Conditions = append(zenlock.Status.Conditions, condition)
 	}
 

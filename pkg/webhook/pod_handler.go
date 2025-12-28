@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,9 +32,10 @@ const (
 
 // PodHandler handles mutating admission webhook requests for Pods
 type PodHandler struct {
-	Client  client.Client
-	decoder admission.Decoder
-	crypto  crypto.Encryptor
+	Client     client.Client
+	decoder    admission.Decoder
+	crypto     crypto.Encryptor
+	privateKey string
 }
 
 // NewPodHandler creates a new PodHandler
@@ -50,14 +52,19 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 	encryptor := crypto.NewAgeEncryptor()
 
 	return &PodHandler{
-		Client:  client,
-		decoder: decoder,
-		crypto:  encryptor,
+		Client:     client,
+		decoder:    decoder,
+		crypto:     encryptor,
+		privateKey: privateKey,
 	}, nil
 }
 
 // Handle processes admission requests
 func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+	// Add timeout to context
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	// Decode Pod
 	pod := &corev1.Pod{}
 	if err := h.decoder.Decode(req, pod); err != nil {
@@ -88,15 +95,15 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 			fmt.Errorf("failed to fetch ZenLock %q: %w", injectName, err))
 	}
 
-	// Load private key from environment
-	privateKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
-	if privateKey == "" {
-		return admission.Errored(http.StatusInternalServerError,
-			fmt.Errorf("ZEN_LOCK_PRIVATE_KEY environment variable is not set"))
+	// Validate AllowedSubjects if specified
+	if len(zenlock.Spec.AllowedSubjects) > 0 {
+		if err := h.validateAllowedSubjects(ctx, pod, zenlock.Spec.AllowedSubjects); err != nil {
+			return admission.Denied(fmt.Sprintf("Pod ServiceAccount not allowed to use ZenLock %q: %v", injectName, err))
+		}
 	}
 
 	// Decrypt data
-	decryptedMap, err := h.crypto.DecryptMap(zenlock.Spec.EncryptedData, privateKey)
+	decryptedMap, err := h.crypto.DecryptMap(zenlock.Spec.EncryptedData, h.privateKey)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError,
 			fmt.Errorf("failed to decrypt ZenLock %q: %w", injectName, err))
@@ -132,7 +139,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	// Create the secret
 	if err := h.Client.Create(ctx, secret); err != nil {
 		// If secret already exists (idempotency), that's okay
-		if !strings.Contains(err.Error(), "already exists") {
+		if !k8serrors.IsAlreadyExists(err) {
 			return admission.Errored(http.StatusInternalServerError,
 				fmt.Errorf("failed to create ephemeral secret: %w", err))
 		}
@@ -229,4 +236,33 @@ func (h *PodHandler) createPatch(pod *corev1.Pod, secretName, mountPath string) 
 	}
 
 	return json.Marshal(patches)
+}
+
+// validateAllowedSubjects checks if the Pod's ServiceAccount is allowed to use the ZenLock
+func (h *PodHandler) validateAllowedSubjects(ctx context.Context, pod *corev1.Pod, allowedSubjects []securityv1alpha1.SubjectReference) error {
+	podServiceAccount := pod.Spec.ServiceAccountName
+	if podServiceAccount == "" {
+		podServiceAccount = "default"
+	}
+
+	podNamespace := pod.Namespace
+	if podNamespace == "" {
+		podNamespace = "default"
+	}
+
+	for _, subject := range allowedSubjects {
+		if subject.Kind == "ServiceAccount" {
+			subjectNamespace := subject.Namespace
+			if subjectNamespace == "" {
+				subjectNamespace = podNamespace
+			}
+
+			if subject.Name == podServiceAccount && subjectNamespace == podNamespace {
+				return nil // Allowed
+			}
+		}
+		// TODO: Support User and Group kinds in the future
+	}
+
+	return fmt.Errorf("ServiceAccount %q in namespace %q is not in the allowed subjects list", podServiceAccount, podNamespace)
 }
