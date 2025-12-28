@@ -114,4 +114,3 @@ file with encrypted data that can be safely committed to Git.`,
 
 	return cmd
 }
-

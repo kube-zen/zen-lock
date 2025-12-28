@@ -21,11 +21,11 @@ import (
 
 const (
 	// Annotation keys
-	annotationInject   = "zen-lock/inject"
+	annotationInject    = "zen-lock/inject"
 	annotationMountPath = "zen-lock/mount-path"
-	
+
 	// Default values
-	defaultMountPath = "/zen-secrets"
+	defaultMountPath  = "/zen-secrets"
 	defaultVolumeName = "zen-secrets"
 )
 
@@ -39,7 +39,7 @@ type PodHandler struct {
 // NewPodHandler creates a new PodHandler
 func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, error) {
 	decoder := admission.NewDecoder(scheme)
-	
+
 	// Load private key from environment
 	privateKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
 	if privateKey == "" {
@@ -84,7 +84,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	}
 
 	if err := h.Client.Get(ctx, zenlockKey, zenlock); err != nil {
-		return admission.Errored(http.StatusInternalServerError, 
+		return admission.Errored(http.StatusInternalServerError,
 			fmt.Errorf("failed to fetch ZenLock %q: %w", injectName, err))
 	}
 
@@ -172,8 +172,8 @@ func (h *PodHandler) createPatch(pod *corev1.Pod, secretName, mountPath string) 
 			})
 		}
 		volumePatch := map[string]interface{}{
-			"op":    "add",
-			"path":  "/spec/volumes/-",
+			"op":   "add",
+			"path": "/spec/volumes/-",
 			"value": map[string]interface{}{
 				"name": defaultVolumeName,
 				"secret": map[string]interface{}{
@@ -230,4 +230,3 @@ func (h *PodHandler) createPatch(pod *corev1.Pod, secretName, mountPath string) 
 
 	return json.Marshal(patches)
 }
-

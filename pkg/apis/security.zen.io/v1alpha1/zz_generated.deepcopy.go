@@ -170,4 +170,3 @@ func (in *SubjectReference) DeepCopy() *SubjectReference {
 	in.DeepCopyInto(out)
 	return out
 }
-

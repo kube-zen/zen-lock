@@ -49,4 +49,3 @@ and never shared. The public key can be shared with your team for encryption.`,
 
 	return cmd
 }
-

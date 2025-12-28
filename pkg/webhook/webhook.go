@@ -20,4 +20,3 @@ func SetupWebhookWithManager(mgr manager.Manager) error {
 
 	return nil
 }
-

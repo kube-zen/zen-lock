@@ -32,4 +32,3 @@ It ensures your secrets are never stored in plaintext in etcd and never visible 
 		os.Exit(1)
 	}
 }
-

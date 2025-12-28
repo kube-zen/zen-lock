@@ -99,4 +99,3 @@ func (a *AgeEncryptor) DecryptMap(encryptedData map[string]string, identity stri
 
 	return result, nil
 }
-

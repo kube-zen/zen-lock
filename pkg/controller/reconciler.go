@@ -78,7 +78,7 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // updateStatus updates the ZenLock status
 func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv1alpha1.ZenLock, phase, reason, message string) {
 	zenlock.Status.Phase = phase
-	
+
 	// Update or create condition
 	condition := securityv1alpha1.ZenLockCondition{
 		Type:    "Decryptable",
@@ -86,7 +86,7 @@ func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv
 		Reason:  reason,
 		Message: message,
 	}
-	
+
 	if phase == "Error" {
 		condition.Status = "False"
 	}
@@ -115,4 +115,3 @@ func (r *ZenLockReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&securityv1alpha1.ZenLock{}).
 		Complete(r)
 }
-

@@ -99,4 +99,3 @@ type ZenLockList struct {
 func init() {
 	SchemeBuilder.Register(&ZenLock{}, &ZenLockList{})
 }
-
