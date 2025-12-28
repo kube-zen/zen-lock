@@ -187,4 +187,3 @@ type loggerKey struct{}
 func (l *Logger) WithTiming(duration time.Duration) *Logger {
 	return l.WithField("duration_ms", duration.Milliseconds())
 }
-

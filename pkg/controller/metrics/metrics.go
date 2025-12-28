@@ -98,4 +98,3 @@ func RecordDecryption(namespace, zenlockName, result string, duration float64) {
 	DecryptionTotal.WithLabelValues(namespace, zenlockName, result).Inc()
 	DecryptionDuration.WithLabelValues(namespace, zenlockName).Observe(duration)
 }
-

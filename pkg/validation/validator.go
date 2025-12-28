@@ -91,4 +91,3 @@ func ValidateSubjectReference(subject *securityv1alpha1.SubjectReference) error 
 
 	return nil
 }
-

@@ -116,4 +116,3 @@ func Wrapf(err error, errType, format string, args ...interface{}) *ZenLockError
 		Err:     err,
 	}
 }
-
