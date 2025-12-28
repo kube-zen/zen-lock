@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+      annotations:
+        # Tell zen-lock to inject 'db-credentials' ZenLock
+        zen-lock/inject: "db-credentials"
+        # Optional: Specify custom mount path (default: /zen-secrets)
+        zen-lock/mount-path: "/etc/config"
+    spec:
+      containers:
+      - name: app
+        image: nginx:latest
+        volumeMounts:
+        - name: zen-secrets
+          mountPath: /etc/config
+          readOnly: true
+        # Example: Use the secret as environment variable
+        env:
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: zen-lock-inject-$(POD_UID)
+              key: DB_USER
+        command:
+        - sh
+        - -c
+        - |
+          echo "DB_USER: $(cat /etc/config/DB_USER)"
+          echo "DB_PASS: $(cat /etc/config/DB_PASS)"
+          sleep 3600
+
