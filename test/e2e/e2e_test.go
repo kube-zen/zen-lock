@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -63,6 +64,11 @@ func init() {
 
 func TestMain(m *testing.M) {
 	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	// Set a default test private key for the controller (tests can override)
+	if os.Getenv("ZEN_LOCK_PRIVATE_KEY") == "" {
+		os.Setenv("ZEN_LOCK_PRIVATE_KEY", "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE")
+	}
 
 	// Setup test environment
 	testEnv = &envtest.Environment{
@@ -172,9 +178,13 @@ func encryptTestData(t *testing.T, plaintext string, publicKey string) string {
 }
 
 func TestZenLockCRD_Exists(t *testing.T) {
-	// Verify CRD exists
+	// Verify CRD exists by checking the scheme
 	zenlock := &securityv1alpha1.ZenLock{}
-	gvk := zenlock.GroupVersionKind()
+	kinds, _, _ := scheme.ObjectKinds(zenlock)
+	if len(kinds) == 0 {
+		t.Fatal("Expected at least one GVK for ZenLock")
+	}
+	gvk := kinds[0]
 	if gvk.Group != "security.zen.io" {
 		t.Errorf("Expected group 'security.zen.io', got '%s'", gvk.Group)
 	}
@@ -184,11 +194,32 @@ func TestZenLockCRD_Exists(t *testing.T) {
 	if gvk.Kind != "ZenLock" {
 		t.Errorf("Expected kind 'ZenLock', got '%s'", gvk.Kind)
 	}
+	
+	// Also verify we can create a GVK directly
+	expectedGVK := schema.GroupVersionKind{
+		Group:   "security.zen.io",
+		Version: "v1alpha1",
+		Kind:    "ZenLock",
+	}
+	if gvk != expectedGVK {
+		t.Errorf("Expected GVK %v, got %v", expectedGVK, gvk)
+	}
 }
 
 func TestZenLockCRUD_E2E(t *testing.T) {
 	ctx := context.Background()
 	namespace := "default"
+
+	// Create namespace with zen-lock label for webhook
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Labels: map[string]string{
+				"zen-lock": "enabled",
+			},
+		},
+	}
+	_ = k8sClient.Create(ctx, ns) // Ignore error if exists
 
 	privateKey, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-value", publicKey)
@@ -265,8 +296,30 @@ func TestZenLockController_Reconciliation(t *testing.T) {
 	ctx := context.Background()
 	namespace := "default"
 
+	// Create namespace with zen-lock label for webhook
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Labels: map[string]string{
+				"zen-lock": "enabled",
+			},
+		},
+	}
+	_ = k8sClient.Create(ctx, ns) // Ignore error if exists
+
 	privateKey, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-value", publicKey)
+
+	// Set private key for controller BEFORE creating ZenLock
+	originalKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
+	defer func() {
+		if originalKey != "" {
+			os.Setenv("ZEN_LOCK_PRIVATE_KEY", originalKey)
+		} else {
+			os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+		}
+	}()
 
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
@@ -281,10 +334,6 @@ func TestZenLockController_Reconciliation(t *testing.T) {
 		},
 	}
 
-	// Set private key for controller
-	os.Setenv("ZEN_LOCK_PRIVATE_KEY", privateKey)
-	defer os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
-
 	// Create ZenLock
 	if err := k8sClient.Create(ctx, zenlock); err != nil {
 		t.Fatalf("Failed to create ZenLock: %v", err)
@@ -293,14 +342,18 @@ func TestZenLockController_Reconciliation(t *testing.T) {
 		k8sClient.Delete(ctx, zenlock)
 	}()
 
-	// Wait for controller to reconcile
-	time.Sleep(3 * time.Second)
-
-	// Verify status was updated
-	retrieved := &securityv1alpha1.ZenLock{}
+	// Wait for controller to reconcile - retry until status is updated
+	var retrieved *securityv1alpha1.ZenLock
 	nn := types.NamespacedName{Name: "e2e-reconcile-test", Namespace: namespace}
-	if err := k8sClient.Get(ctx, nn, retrieved); err != nil {
-		t.Fatalf("Failed to get ZenLock: %v", err)
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		retrieved = &securityv1alpha1.ZenLock{}
+		if err := k8sClient.Get(ctx, nn, retrieved); err != nil {
+			t.Fatalf("Failed to get ZenLock: %v", err)
+		}
+		if retrieved.Status.Phase != "" {
+			break
+		}
 	}
 
 	// Check that status has been updated
@@ -308,12 +361,12 @@ func TestZenLockController_Reconciliation(t *testing.T) {
 		t.Error("Expected Phase to be set by controller")
 	}
 
-	// Check conditions
-	readyCondition := findCondition(retrieved.Status.Conditions, "Ready")
-	if readyCondition == nil {
-		t.Error("Expected Ready condition to be set")
-	} else if readyCondition.Status != "True" {
-		t.Errorf("Expected Ready condition to be True, got %s", readyCondition.Status)
+	// Check conditions - controller sets "Decryptable" condition
+	decryptableCondition := findCondition(retrieved.Status.Conditions, "Decryptable")
+	if decryptableCondition == nil {
+		t.Error("Expected Decryptable condition to be set")
+	} else if decryptableCondition.Status != "True" {
+		t.Errorf("Expected Decryptable condition to be True, got %s", decryptableCondition.Status)
 	}
 }
 
@@ -324,6 +377,17 @@ func TestPodInjection_E2E(t *testing.T) {
 
 	ctx := context.Background()
 	namespace := "default"
+
+	// Create namespace with zen-lock label for webhook
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Labels: map[string]string{
+				"zen-lock": "enabled",
+			},
+		},
+	}
+	_ = k8sClient.Create(ctx, ns) // Ignore error if exists
 
 	privateKey, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-secret-value", publicKey)
@@ -471,6 +535,17 @@ func TestAllowedSubjects_E2E(t *testing.T) {
 
 	ctx := context.Background()
 	namespace := "default"
+
+	// Create namespace with zen-lock label for webhook
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Labels: map[string]string{
+				"zen-lock": "enabled",
+			},
+		},
+	}
+	_ = k8sClient.Create(ctx, ns) // Ignore error if exists
 
 	privateKey, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-value", publicKey)
@@ -629,6 +704,17 @@ func TestZenLock_InvalidCiphertext(t *testing.T) {
 	ctx := context.Background()
 	namespace := "default"
 
+	// Create namespace with zen-lock label for webhook
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Labels: map[string]string{
+				"zen-lock": "enabled",
+			},
+		},
+	}
+	_ = k8sClient.Create(ctx, ns) // Ignore error if exists
+
 	privateKey, _ := generateTestKeys(t)
 
 	// Set private key for controller
@@ -667,9 +753,9 @@ func TestZenLock_InvalidCiphertext(t *testing.T) {
 	}
 
 	// Check that status reflects error
-	errorCondition := findCondition(retrieved.Status.Conditions, "Ready")
+	errorCondition := findCondition(retrieved.Status.Conditions, "Decryptable")
 	if errorCondition != nil && errorCondition.Status == "True" {
-		t.Error("Expected Ready condition to be False for invalid ciphertext")
+		t.Error("Expected Decryptable condition to be False for invalid ciphertext")
 	}
 }
 
