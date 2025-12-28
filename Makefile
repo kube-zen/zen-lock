@@ -56,9 +56,45 @@ build-image:
 	@echo "✅ Docker image built: kube-zen/zen-lock-webhook:$$VERSION"
 
 # Run all tests
-test:
-	@echo "Running tests..."
+test: test-unit test-integration
+
+# Run unit tests
+test-unit:
+	@echo "Running unit tests..."
 	go test -v -race -coverprofile=coverage.out -covermode=atomic -timeout=10m ./pkg/...
+
+# Run integration tests
+test-integration:
+	@echo "Running integration tests..."
+	go test -v -timeout=5m ./test/integration/...
+
+# Run E2E tests (requires Kubernetes cluster)
+test-e2e:
+	@echo "Running E2E tests..."
+	@if [ -z "$$(go list -f '{{.Dir}}' -m sigs.k8s.io/controller-runtime 2>/dev/null)" ]; then \
+		echo "⚠️  E2E tests require envtest. Install: go get sigs.k8s.io/controller-runtime/pkg/envtest"; \
+		exit 1; \
+	fi
+	go test -v -tags=e2e -timeout=30m ./test/e2e/...
+
+# Show test coverage
+coverage: test-unit
+	@echo "Generating coverage report..."
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "✅ Coverage report generated: coverage.html"
+	@echo "Coverage summary:"
+	@go tool cover -func=coverage.out | tail -1
+	@echo ""
+	@echo "Checking coverage threshold (minimum: 75%)..."
+	@COVERAGE=$$(go tool cover -func=coverage.out | grep -v "pkg/apis" | grep "total:" | awk '{print $$3}' | sed 's/%//'); \
+	if [ -z "$$COVERAGE" ]; then \
+		echo "⚠️  Could not determine coverage percentage"; \
+	elif [ $$(echo "$$COVERAGE < 75" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then \
+		echo "❌ Coverage $$COVERAGE% is below the 75% threshold"; \
+		exit 1; \
+	else \
+		echo "✅ Coverage $$COVERAGE% meets the 75% threshold"; \
+	fi
 
 # Format code
 fmt:
@@ -109,8 +145,18 @@ verify: check-fmt check-mod vet
 	go build ./...
 	@echo "✅ Code compiles successfully"
 
+# Security checks
+security-check:
+	@echo "Running security checks..."
+	@if ! command -v govulncheck >/dev/null 2>&1; then \
+		echo "Installing govulncheck..."; \
+		go install golang.org/x/vuln/cmd/govulncheck@latest; \
+	fi
+	govulncheck ./...
+	@echo "✅ Security check passed"
+
 # CI check (runs all checks)
-ci-check: verify lint test
+ci-check: verify lint test-unit security-check
 	@echo "✅ All CI checks passed"
 
 # Clean build artifacts
