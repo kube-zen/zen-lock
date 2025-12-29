@@ -129,16 +129,16 @@ Ephemeral secrets are standard Kubernetes Secrets with:
 
 ### Secret Lifecycle
 
-1. **Creation**: Webhook creates Secret with labels (Pod UID not yet available)
+1. **Creation**: Injection webhook creates ephemeral Kubernetes Secret with labels (Pod UID not yet available)
 2. **OwnerReference**: SecretReconciler sets OwnerReference once Pod UID is available
-3. **Cleanup**: Kubernetes automatically deletes Secret when Pod is deleted
-4. **Orphan Cleanup**: SecretReconciler deletes orphaned Secrets (>1 minute old, Pod not found)
+3. **Cleanup**: Kubernetes automatically deletes ephemeral Kubernetes Secret when Pod is deleted
+4. **Orphan Cleanup**: SecretReconciler deletes orphaned ephemeral Kubernetes Secrets (>1 minute old, Pod not found)
 
 ### Stale-Secret Prevention
 
-- Webhook validates existing Secrets on `AlreadyExists` errors
-- Checks if Secret matches current ZenLock (by label)
-- Refreshes Secret data if ZenLock was updated
+- Injection webhook validates existing ephemeral Kubernetes Secrets on `AlreadyExists` errors
+- Checks if ephemeral Kubernetes Secret matches current ZenLock CRD (by label)
+- Refreshes ephemeral Kubernetes Secret data if ZenLock CRD was updated
 - Prevents stale secrets when Pod names are reused
 
 ## Webhook Configuration
