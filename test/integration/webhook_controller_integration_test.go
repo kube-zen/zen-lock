@@ -470,7 +470,6 @@ func TestFullLifecycle_Integration(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
 	resp := handler.Handle(ctx, req)
 	if !resp.Allowed {
 		t.Fatalf("Expected webhook to allow request, got: %v", resp.Result)
