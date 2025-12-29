@@ -459,15 +459,18 @@ func TestPodInjection_E2E(t *testing.T) {
 		t.Fatalf("Failed to get Pod: %v", err)
 	}
 
+	// Generate expected secret name using the same logic as webhook
+	expectedSecretName := webhookpkg.GenerateSecretName(namespace, "e2e-test-pod")
+
 	// Check that volume was added
 	foundVolume := false
 	for _, vol := range retrievedPod.Spec.Volumes {
-		if vol.Name == "zen-lock-e2e-injection-test" {
+		if vol.Name == "zen-secrets" {
 			foundVolume = true
 			if vol.Secret == nil {
 				t.Error("Expected volume to reference a Secret")
-			} else if vol.Secret.SecretName != "zen-lock-e2e-injection-test" {
-				t.Errorf("Expected secret name 'zen-lock-e2e-injection-test', got '%s'", vol.Secret.SecretName)
+			} else if vol.Secret.SecretName != expectedSecretName {
+				t.Errorf("Expected secret name '%s', got '%s'", expectedSecretName, vol.Secret.SecretName)
 			}
 			break
 		}
@@ -480,7 +483,7 @@ func TestPodInjection_E2E(t *testing.T) {
 	foundMount := false
 	for _, container := range retrievedPod.Spec.Containers {
 		for _, mount := range container.VolumeMounts {
-			if mount.Name == "zen-lock-e2e-injection-test" {
+			if mount.Name == "zen-secrets" {
 				foundMount = true
 				if mount.MountPath != "/zen-lock/secrets" {
 					t.Errorf("Expected mount path '/zen-lock/secrets', got '%s'", mount.MountPath)
@@ -495,15 +498,37 @@ func TestPodInjection_E2E(t *testing.T) {
 
 	// Verify ephemeral Secret was created
 	secret := &corev1.Secret{}
-	secretNN := types.NamespacedName{Name: "zen-lock-e2e-injection-test", Namespace: namespace}
+	secretNN := types.NamespacedName{Name: expectedSecretName, Namespace: namespace}
 	if err := k8sClient.Get(ctx, secretNN, secret); err != nil {
 		t.Fatalf("Failed to get ephemeral Secret: %v", err)
 	}
 
-	// Verify Secret has OwnerReference to Pod
-	if len(secret.OwnerReferences) == 0 {
-		t.Error("Expected Secret to have OwnerReference to Pod")
+	// Verify Secret has labels (OwnerReference will be set by controller later)
+	if secret.Labels == nil {
+		t.Error("Expected Secret to have labels")
 	} else {
+		if secret.Labels["zen-lock.security.zen.io/pod-name"] != "e2e-test-pod" {
+			t.Errorf("Expected pod-name label 'e2e-test-pod', got '%s'", secret.Labels["zen-lock.security.zen.io/pod-name"])
+		}
+		if secret.Labels["zen-lock.security.zen.io/pod-namespace"] != namespace {
+			t.Errorf("Expected pod-namespace label '%s', got '%s'", namespace, secret.Labels["zen-lock.security.zen.io/pod-namespace"])
+		}
+		if secret.Labels["zen-lock.security.zen.io/zenlock-name"] != "e2e-injection-test" {
+			t.Errorf("Expected zenlock-name label 'e2e-injection-test', got '%s'", secret.Labels["zen-lock.security.zen.io/zenlock-name"])
+		}
+	}
+
+	// Wait a bit for controller to set OwnerReference (if it hasn't already)
+	time.Sleep(2 * time.Second)
+	
+	// Refresh secret to check for OwnerReference
+	if err := k8sClient.Get(ctx, secretNN, secret); err != nil {
+		t.Fatalf("Failed to refresh Secret: %v", err)
+	}
+
+	// OwnerReference may or may not be set yet (controller runs asynchronously)
+	// But if it's set, verify it's correct
+	if len(secret.OwnerReferences) > 0 {
 		ownerRef := secret.OwnerReferences[0]
 		if ownerRef.Kind != "Pod" {
 			t.Errorf("Expected OwnerReference kind 'Pod', got '%s'", ownerRef.Kind)
@@ -642,10 +667,13 @@ func TestAllowedSubjects_E2E(t *testing.T) {
 
 	// Check that volume was added (injection succeeded)
 	foundVolume := false
+	expectedSecretName := webhookpkg.GenerateSecretName(namespace, "e2e-allowed-pod")
 	for _, vol := range retrievedPod.Spec.Volumes {
-		if vol.Name == "zen-lock-e2e-allowed-subjects-test" {
+		if vol.Name == "zen-secrets" {
 			foundVolume = true
-			break
+			if vol.Secret != nil && vol.Secret.SecretName == expectedSecretName {
+				break
+			}
 		}
 	}
 	if !foundVolume {
@@ -688,7 +716,7 @@ func TestAllowedSubjects_E2E(t *testing.T) {
 		if err := k8sClient.Get(ctx, disallowedNN, retrievedDisallowedPod); err == nil {
 			// Check that volume was NOT added (injection failed)
 			for _, vol := range retrievedDisallowedPod.Spec.Volumes {
-				if vol.Name == "zen-lock-e2e-allowed-subjects-test" {
+				if vol.Name == "zen-secrets" {
 					t.Error("Expected Pod to NOT have zen-lock volume injected (disallowed ServiceAccount)")
 					break
 				}

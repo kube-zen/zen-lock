@@ -4,14 +4,46 @@ This document outlines security best practices for using zen-lock in production 
 
 ## Table of Contents
 
-1. [Key Management](#key-management)
-2. [Private Key Storage](#private-key-storage)
-3. [Key Rotation](#key-rotation)
-4. [Access Control](#access-control)
-5. [Network Security](#network-security)
-6. [Multi-Tenancy](#multi-tenancy)
-7. [Audit and Monitoring](#audit-and-monitoring)
-8. [Compliance](#compliance)
+1. [Security Model](#security-model)
+2. [Key Management](#key-management)
+3. [Private Key Storage](#private-key-storage)
+4. [Key Rotation](#key-rotation)
+5. [Access Control](#access-control)
+6. [Network Security](#network-security)
+7. [Multi-Tenancy](#multi-tenancy)
+8. [Audit and Monitoring](#audit-and-monitoring)
+9. [Compliance](#compliance)
+
+## Security Model
+
+### Zero-Knowledge Encryption
+
+zen-lock implements Zero-Knowledge encryption with the following security properties:
+
+**ZenLock CRD (Source of Truth)**:
+- Stored in etcd as unreadable ciphertext
+- API server cannot decrypt the data
+- Safe to commit to Git
+- Encrypted client-side before reaching the cluster
+
+**Ephemeral Secrets (Runtime)**:
+- Created by webhook as standard Kubernetes Secrets
+- Stored in etcd (protected by encryption at rest if configured)
+- Contain decrypted plaintext data
+- Short-lived (only exist during Pod lifetime)
+- Automatically deleted when Pod terminates (via OwnerReference)
+
+### Important Security Considerations
+
+1. **etcd Encryption at Rest**: While ZenLock CRDs are encrypted, ephemeral Secrets are standard Kubernetes Secrets. Enable etcd encryption at rest for additional protection.
+
+2. **RBAC Controls**: Use RBAC to restrict access to Secrets. The webhook creates Secrets with labels for tracking, and the controller sets OwnerReferences.
+
+3. **Network Policies**: Restrict access to etcd and the webhook endpoint using Network Policies.
+
+4. **Secret Lifetime**: Ephemeral Secrets are automatically cleaned up when Pods terminate, but ensure etcd encryption is enabled for defense-in-depth.
+
+See [Architecture](ARCHITECTURE.md#security-model) for more details.
 
 ## Key Management
 
@@ -296,10 +328,14 @@ Set up alerts for:
 
 zen-lock helps with compliance by:
 
-- **Encryption at rest**: Secrets stored as ciphertext in etcd
-- **Zero-knowledge**: API server cannot read secrets
+- **Encryption at rest (ZenLock CRD)**: Source-of-truth secrets stored as ciphertext in etcd
+- **Zero-knowledge (ZenLock CRD)**: API server cannot read encrypted ZenLock data
 - **Ephemeral secrets**: Decrypted secrets exist only during Pod lifetime
+- **Automatic cleanup**: OwnerReference ensures secrets are deleted when Pods terminate
 - **Audit trail**: All operations are logged
+- **RBAC controls**: Fine-grained access control
+
+**Note**: Ephemeral Secrets are standard Kubernetes Secrets. Enable etcd encryption at rest for full protection of decrypted secrets.
 
 ### Regulatory Requirements
 

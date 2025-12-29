@@ -75,10 +75,17 @@ Pod Creation:
 
 ### Zero-Knowledge Principles
 
-1. **At Rest**: Secrets stored as ciphertext in etcd
-2. **In Transit**: Encryption happens client-side
-3. **In Memory**: Decrypted secrets exist only as ephemeral Kubernetes Secrets
-4. **Auto-Cleanup**: Secrets deleted when Pod terminates (via OwnerReference)
+1. **At Rest (ZenLock CRD)**: Secrets stored as ciphertext in etcd. The API server cannot read the encrypted data.
+2. **At Rest (Ephemeral Secrets)**: Decrypted secrets are stored as standard Kubernetes Secrets in etcd. These are protected by:
+   - Encryption at rest (if configured for etcd)
+   - RBAC controls
+   - OwnerReference-based automatic cleanup
+   - Short-lived nature (only exist during Pod lifetime)
+3. **In Transit**: Encryption happens client-side before data reaches the cluster
+4. **In Memory**: Decrypted secrets exist as ephemeral Kubernetes Secrets mounted into Pods
+5. **Auto-Cleanup**: Secrets deleted when Pod terminates (via OwnerReference set by controller)
+
+**Important**: While the source-of-truth (ZenLock CRD) is encrypted, ephemeral Secrets created by the webhook are standard Kubernetes Secrets. Enable etcd encryption at rest for additional protection.
 
 ### Key Management
 

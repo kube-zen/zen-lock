@@ -16,14 +16,17 @@ type ZenLockSpec struct {
 	Algorithm string `json:"algorithm,omitempty"`
 
 	// AllowedSubjects is an optional list of ServiceAccounts allowed to use this secret
+	// Currently only ServiceAccount kind is supported. User and Group kinds are not yet implemented.
 	// +optional
 	AllowedSubjects []SubjectReference `json:"allowedSubjects,omitempty"`
 }
 
-// SubjectReference references a Kubernetes subject (ServiceAccount, User, Group)
+// SubjectReference references a Kubernetes subject
+// Currently only ServiceAccount kind is supported. User and Group kinds are planned for future releases.
 type SubjectReference struct {
-	// Kind is the kind of subject (ServiceAccount, User, Group)
+	// Kind is the kind of subject. Currently only "ServiceAccount" is supported.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=ServiceAccount
 	Kind string `json:"kind"`
 
 	// Name is the name of the subject

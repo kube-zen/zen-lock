@@ -24,6 +24,7 @@ spec:
   algorithm: age
   
   # Optional: List of ServiceAccounts allowed to use this secret
+  # Currently only ServiceAccount kind is supported
   allowedSubjects:
   - kind: ServiceAccount
     name: backend-app

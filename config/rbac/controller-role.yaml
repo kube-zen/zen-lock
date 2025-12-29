@@ -1,37 +1,22 @@
-# ServiceAccounts
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: zen-lock-controller
-  namespace: zen-lock-system
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: zen-lock-webhook
-  namespace: zen-lock-system
----
-# Note: This file is deprecated. Use controller-role.yaml and webhook-role.yaml instead.
-# Kept for backward compatibility during migration.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: zen-lock-manager
+  name: zen-lock-controller
   annotations:
-    rbac.authorization.k8s.io/justification: "DEPRECATED: Use zen-lock-controller and zen-lock-webhook roles instead. This role is kept for backward compatibility."
+    rbac.authorization.k8s.io/justification: "Controller reconciles ZenLocks and updates their status. Also sets OwnerReferences on Secrets created by webhook."
 rules:
-  # ZenLock CRD: Read and update status
+  # ZenLock CRD: Read and update status only
   - apiGroups: ["security.zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["security.zen.io"]
     resources: ["zenlocks/status"]
     verbs: ["get", "update", "patch"]
-  # Secrets: Create and update (for ephemeral secrets and OwnerReference setting)
+  # Secrets: Update to set OwnerReferences (created by webhook)
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
-  # Pods: Read access
+    verbs: ["get", "list", "watch", "update", "patch"]
+  # Pods: Read to get UID for OwnerReference
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
@@ -47,13 +32,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: zen-lock-manager
+  name: zen-lock-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: zen-lock-manager
+  name: zen-lock-controller
 subjects:
   - kind: ServiceAccount
-    name: zen-lock-webhook
+    name: zen-lock-controller
     namespace: zen-lock-system
 

@@ -254,19 +254,16 @@ func TestEphemeralSecretCleanup_Integration(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
-	// Create ephemeral Secret with OwnerReference to Pod
+	// Create ephemeral Secret with labels (OwnerReference will be set by controller later)
+	// This matches the actual webhook behavior
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "zen-lock-inject-test-pod-uid",
+			Name:      "zen-lock-inject-default-test-pod-abc123",
 			Namespace: "default",
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "v1",
-					Kind:       "Pod",
-					Name:       pod.Name,
-					UID:        pod.UID,
-					Controller: func() *bool { b := true; return &b }(),
-				},
+			Labels: map[string]string{
+				"zen-lock.security.zen.io/pod-name":      pod.Name,
+				"zen-lock.security.zen.io/pod-namespace": "default",
+				"zen-lock.security.zen.io/zenlock-name": "test-secret",
 			},
 		},
 		Data: map[string][]byte{
@@ -280,35 +277,25 @@ func TestEphemeralSecretCleanup_Integration(t *testing.T) {
 
 	// Verify Secret exists
 	retrievedSecret := &corev1.Secret{}
-	secretNN := types.NamespacedName{Name: "zen-lock-inject-test-pod-uid", Namespace: "default"}
+	secretNN := types.NamespacedName{Name: "zen-lock-inject-default-test-pod-abc123", Namespace: "default"}
 	if err := client.Get(ctx, secretNN, retrievedSecret); err != nil {
 		t.Fatalf("Failed to get Secret: %v", err)
 	}
 
-	// Verify OwnerReference
-	if len(retrievedSecret.OwnerReferences) == 0 {
-		t.Error("Expected Secret to have OwnerReference")
+	// Verify labels (OwnerReference will be set by controller when Pod exists)
+	if retrievedSecret.Labels == nil {
+		t.Error("Expected Secret to have labels")
 	} else {
-		ownerRef := retrievedSecret.OwnerReferences[0]
-		if ownerRef.Kind != "Pod" {
-			t.Errorf("Expected OwnerReference kind 'Pod', got '%s'", ownerRef.Kind)
+		if retrievedSecret.Labels["zen-lock.security.zen.io/pod-name"] != "test-pod" {
+			t.Errorf("Expected pod-name label 'test-pod', got '%s'", retrievedSecret.Labels["zen-lock.security.zen.io/pod-name"])
 		}
-		if ownerRef.Name != "test-pod" {
-			t.Errorf("Expected OwnerReference name 'test-pod', got '%s'", ownerRef.Name)
-		}
-		if ownerRef.UID != pod.UID {
-			t.Errorf("Expected OwnerReference UID %s, got %s", pod.UID, ownerRef.UID)
+		if retrievedSecret.Labels["zen-lock.security.zen.io/pod-namespace"] != "default" {
+			t.Errorf("Expected pod-namespace label 'default', got '%s'", retrievedSecret.Labels["zen-lock.security.zen.io/pod-namespace"])
 		}
 	}
 
-	// Delete Pod - Secret should be automatically deleted by Kubernetes
-	if err := client.Delete(ctx, pod); err != nil {
-		t.Fatalf("Failed to delete Pod: %v", err)
-	}
-
-	// Wait a bit for garbage collection (in real cluster, this happens automatically)
-	// In fake client, we need to manually verify the relationship
-	// The test verifies that OwnerReference is correctly set
+	// Note: In a real cluster, the SecretReconciler would set the OwnerReference
+	// when the Pod exists. This test verifies the label-based tracking pattern.
 }
 
 func TestAllowedSubjectsValidation_Integration(t *testing.T) {

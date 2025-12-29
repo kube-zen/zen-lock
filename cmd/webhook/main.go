@@ -77,14 +77,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup controller
-	reconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
+	// Setup ZenLock controller
+	zenlockReconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
 	if err != nil {
-		setupLog.Error(err, "unable to create reconciler")
+		setupLog.Error(err, "unable to create ZenLock reconciler")
 		os.Exit(1)
 	}
-	if err := reconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup controller")
+	if err := zenlockReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup ZenLock controller")
+		os.Exit(1)
+	}
+
+	// Setup Secret controller (sets OwnerReferences on webhook-created Secrets)
+	secretReconciler := controller.NewSecretReconciler(mgr.GetClient(), mgr.GetScheme())
+	if err := secretReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup Secret controller")
 		os.Exit(1)
 	}
 

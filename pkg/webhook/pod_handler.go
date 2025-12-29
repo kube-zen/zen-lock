@@ -2,6 +2,8 @@ package webhook
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,9 +29,28 @@ const (
 	annotationMountPath = "zen-lock/mount-path"
 
 	// Default values
-	defaultMountPath  = "/zen-secrets"
+	defaultMountPath  = "/zen-lock/secrets"
 	defaultVolumeName = "zen-secrets"
+
+	// Label keys for Secret tracking
+	labelPodName      = "zen-lock.security.zen.io/pod-name"
+	labelPodNamespace = "zen-lock.security.zen.io/pod-namespace"
+	labelZenLockName  = "zen-lock.security.zen.io/zenlock-name"
 )
+
+// GenerateSecretName generates a stable secret name from namespace and pod name
+// This function is exported for testing purposes
+func GenerateSecretName(namespace, podName string) string {
+	secretNameBase := fmt.Sprintf("zen-lock-inject-%s-%s", namespace, podName)
+	hash := sha256.Sum256([]byte(secretNameBase))
+	hashStr := hex.EncodeToString(hash[:])[:16] // Use first 16 chars of hash
+	secretName := fmt.Sprintf("zen-lock-inject-%s-%s-%s", namespace, podName, hashStr)
+	// Ensure name is valid (max 253 chars, lowercase alphanumeric + dash)
+	if len(secretName) > 253 {
+		secretName = secretName[:253]
+	}
+	return secretName
+}
 
 // PodHandler handles mutating admission webhook requests for Pods
 type PodHandler struct {
@@ -130,22 +151,19 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		secretData[k] = v
 	}
 
-	// Generate unique secret name based on Pod UID
-	secretName := fmt.Sprintf("zen-lock-inject-%s", string(pod.UID))
+	// Generate stable secret name from namespace and pod name (available at admission time)
+	secretName := GenerateSecretName(req.Namespace, pod.Name)
 
-	// Create ephemeral Secret with OwnerReference to Pod
+	// Create ephemeral Secret with labels (OwnerReference will be set by controller later)
+	// Pod UID is not available at admission time, so we use labels for tracking
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: req.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "v1",
-					Kind:       "Pod",
-					Name:       pod.Name,
-					UID:        pod.UID,
-					Controller: func() *bool { b := true; return &b }(),
-				},
+			Labels: map[string]string{
+				labelPodName:      pod.Name,
+				labelPodNamespace: req.Namespace,
+				labelZenLockName:  injectName,
 			},
 		},
 		Data: secretData,
@@ -153,35 +171,44 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 
 	// Create the secret
 	if err := h.Client.Create(ctx, secret); err != nil {
-		// If secret already exists (idempotency), that's okay
+		// If secret already exists (idempotency), that's okay - use existing secret
 		if !k8serrors.IsAlreadyExists(err) {
 			duration := time.Since(startTime).Seconds()
 			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 			return admission.Errored(http.StatusInternalServerError,
 				fmt.Errorf("failed to create ephemeral secret: %w", err))
 		}
+		// Secret already exists - this is fine for idempotency
 	}
 
-	// Create JSON patch to add volume and volume mounts
-	patch, err := h.createPatch(pod, secretName, mountPath)
+	// Mutate Pod object in-memory (correct pattern for PatchResponseFromRaw)
+	mutatedPod := pod.DeepCopy()
+	if err := h.mutatePod(mutatedPod, secretName, mountPath); err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+		return admission.Errored(http.StatusInternalServerError,
+			fmt.Errorf("failed to mutate pod: %w", err))
+	}
+
+	// Marshal mutated pod
+	mutatedPodBytes, err := json.Marshal(mutatedPod)
 	if err != nil {
 		duration := time.Since(startTime).Seconds()
 		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 		return admission.Errored(http.StatusInternalServerError,
-			fmt.Errorf("failed to create patch: %w", err))
+			fmt.Errorf("failed to marshal mutated pod: %w", err))
 	}
 
 	// Record successful injection
 	duration := time.Since(startTime).Seconds()
 	metrics.RecordWebhookInjection(req.Namespace, injectName, "success", duration)
 
-	return admission.PatchResponseFromRaw(req.Object.Raw, patch)
+	// Use PatchResponseFromRaw with original and mutated bytes (correct pattern)
+	return admission.PatchResponseFromRaw(req.Object.Raw, mutatedPodBytes)
 }
 
-// createPatch creates a JSON patch to add the secret volume and volume mounts
-func (h *PodHandler) createPatch(pod *corev1.Pod, secretName, mountPath string) ([]byte, error) {
-	patches := []map[string]interface{}{}
-
+// mutatePod mutates the Pod object in-memory to add volume and volume mounts
+func (h *PodHandler) mutatePod(pod *corev1.Pod, secretName, mountPath string) error {
 	// Check if volume already exists
 	volumeExists := false
 	for _, vol := range pod.Spec.Volumes {
@@ -193,72 +220,58 @@ func (h *PodHandler) createPatch(pod *corev1.Pod, secretName, mountPath string) 
 
 	// Add volume to pod spec if it doesn't exist
 	if !volumeExists {
-		// Ensure volumes array exists
-		if len(pod.Spec.Volumes) == 0 {
-			patches = append(patches, map[string]interface{}{
-				"op":    "add",
-				"path":  "/spec/volumes",
-				"value": []interface{}{},
-			})
-		}
-		volumePatch := map[string]interface{}{
-			"op":   "add",
-			"path": "/spec/volumes/-",
-			"value": map[string]interface{}{
-				"name": defaultVolumeName,
-				"secret": map[string]interface{}{
-					"secretName": secretName,
+		volume := corev1.Volume{
+			Name: defaultVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: secretName,
 				},
 			},
 		}
-		patches = append(patches, volumePatch)
+		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 	}
 
 	// Add volume mount to all containers
 	for i := range pod.Spec.Containers {
-		// Ensure volumeMounts array exists
-		if len(pod.Spec.Containers[i].VolumeMounts) == 0 {
-			patches = append(patches, map[string]interface{}{
-				"op":    "add",
-				"path":  fmt.Sprintf("/spec/containers/%d/volumeMounts", i),
-				"value": []interface{}{},
-			})
+		// Check if mount already exists
+		mountExists := false
+		for _, mount := range pod.Spec.Containers[i].VolumeMounts {
+			if mount.Name == defaultVolumeName {
+				mountExists = true
+				break
+			}
 		}
-		volumeMountPatch := map[string]interface{}{
-			"op":   "add",
-			"path": fmt.Sprintf("/spec/containers/%d/volumeMounts/-", i),
-			"value": map[string]interface{}{
-				"name":      defaultVolumeName,
-				"mountPath": mountPath,
-				"readOnly":  true,
-			},
+		if !mountExists {
+			volumeMount := corev1.VolumeMount{
+				Name:      defaultVolumeName,
+				MountPath: mountPath,
+				ReadOnly:  true,
+			}
+			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, volumeMount)
 		}
-		patches = append(patches, volumeMountPatch)
 	}
 
 	// Add volume mount to all init containers
 	for i := range pod.Spec.InitContainers {
-		// Ensure volumeMounts array exists
-		if len(pod.Spec.InitContainers[i].VolumeMounts) == 0 {
-			patches = append(patches, map[string]interface{}{
-				"op":    "add",
-				"path":  fmt.Sprintf("/spec/initContainers/%d/volumeMounts", i),
-				"value": []interface{}{},
-			})
+		// Check if mount already exists
+		mountExists := false
+		for _, mount := range pod.Spec.InitContainers[i].VolumeMounts {
+			if mount.Name == defaultVolumeName {
+				mountExists = true
+				break
+			}
 		}
-		volumeMountPatch := map[string]interface{}{
-			"op":   "add",
-			"path": fmt.Sprintf("/spec/initContainers/%d/volumeMounts/-", i),
-			"value": map[string]interface{}{
-				"name":      defaultVolumeName,
-				"mountPath": mountPath,
-				"readOnly":  true,
-			},
+		if !mountExists {
+			volumeMount := corev1.VolumeMount{
+				Name:      defaultVolumeName,
+				MountPath: mountPath,
+				ReadOnly:  true,
+			}
+			pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
 		}
-		patches = append(patches, volumeMountPatch)
 	}
 
-	return json.Marshal(patches)
+	return nil
 }
 
 // validateAllowedSubjects checks if the Pod's ServiceAccount is allowed to use the ZenLock
@@ -274,17 +287,19 @@ func (h *PodHandler) validateAllowedSubjects(ctx context.Context, pod *corev1.Po
 	}
 
 	for _, subject := range allowedSubjects {
-		if subject.Kind == "ServiceAccount" {
-			subjectNamespace := subject.Namespace
-			if subjectNamespace == "" {
-				subjectNamespace = podNamespace
-			}
-
-			if subject.Name == podServiceAccount && subjectNamespace == podNamespace {
-				return nil // Allowed
-			}
+		// Only ServiceAccount is supported (User and Group require additional resolution)
+		if subject.Kind != "ServiceAccount" {
+			continue
 		}
-		// TODO: Support User and Group kinds in the future
+
+		subjectNamespace := subject.Namespace
+		if subjectNamespace == "" {
+			subjectNamespace = podNamespace
+		}
+
+		if subject.Name == podServiceAccount && subjectNamespace == podNamespace {
+			return nil // Allowed
+		}
 	}
 
 	return fmt.Errorf("ServiceAccount %q in namespace %q is not in the allowed subjects list", podServiceAccount, podNamespace)

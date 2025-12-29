@@ -220,12 +220,19 @@ make run
 
 ## Security Model
 
-zen-lock implements Zero-Knowledge encryption:
+zen-lock implements Zero-Knowledge encryption with the following security properties:
 
-- **At Rest**: The ZenLock CRD stored in etcd contains only unreadable ciphertext.
-- **In Transit**: Encryption happens on the developer's machine.
-- **In Memory**: The decrypted value exists only as a standard Kubernetes Secret mounted into the Pod.
+- **At Rest (ZenLock CRD)**: The ZenLock CRD stored in etcd contains only unreadable ciphertext. The API server cannot read the encrypted data.
+- **At Rest (Ephemeral Secrets)**: Decrypted secrets are stored as standard Kubernetes Secrets in etcd. These are protected by:
+  - Encryption at rest (if configured for etcd)
+  - RBAC controls
+  - OwnerReference-based automatic cleanup
+  - Short-lived nature (only exist during Pod lifetime)
+- **In Transit**: Encryption happens on the developer's machine before data reaches the cluster.
+- **In Memory**: The decrypted value exists as a standard Kubernetes Secret mounted into the Pod.
 - **Auto-Cleanup**: By setting the OwnerReference of the decrypted secret to the Pod, Kubernetes guarantees that the secret is deleted when the Pod is removed.
+
+**Important**: While the source-of-truth (ZenLock CRD) is encrypted, ephemeral Secrets created by the webhook are standard Kubernetes Secrets. Enable etcd encryption at rest for additional protection.
 
 ## Documentation
 

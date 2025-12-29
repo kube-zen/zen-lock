@@ -19,7 +19,6 @@ package webhook
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -162,7 +161,7 @@ func TestValidateAllowedSubjects(t *testing.T) {
 	}
 }
 
-func TestCreatePatch(t *testing.T) {
+func TestMutatePod(t *testing.T) {
 	handler, _ := setupTestPodHandler(t)
 
 	tests := []struct {
@@ -227,19 +226,42 @@ func TestCreatePatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			patch, err := handler.createPatch(tt.pod, tt.secretName, tt.mountPath)
+			originalPod := tt.pod.DeepCopy()
+			err := handler.mutatePod(tt.pod, tt.secretName, tt.mountPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("createPatch() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("mutatePod() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr {
-				if len(patch) == 0 {
-					t.Error("createPatch() returned empty patch")
+				// Verify volume was added
+				foundVolume := false
+				for _, vol := range tt.pod.Spec.Volumes {
+					if vol.Name == "zen-secrets" && vol.Secret != nil && vol.Secret.SecretName == tt.secretName {
+						foundVolume = true
+						break
+					}
 				}
-				// Verify it's valid JSON
-				var patches []map[string]interface{}
-				if err := json.Unmarshal(patch, &patches); err != nil {
-					t.Errorf("createPatch() returned invalid JSON: %v", err)
+				if !foundVolume {
+					t.Error("mutatePod() did not add expected volume")
+				}
+
+				// Verify volume mounts were added to containers
+				for i, container := range tt.pod.Spec.Containers {
+					foundMount := false
+					for _, mount := range container.VolumeMounts {
+						if mount.Name == "zen-secrets" && mount.MountPath == tt.mountPath {
+							foundMount = true
+							break
+						}
+					}
+					if !foundMount {
+						t.Errorf("mutatePod() did not add volume mount to container %d", i)
+					}
+				}
+
+				// Verify original pod was not modified (deep copy worked)
+				if len(originalPod.Spec.Volumes) == len(tt.pod.Spec.Volumes) && len(originalPod.Spec.Volumes) > 0 {
+					t.Error("mutatePod() should have added a volume")
 				}
 			}
 		})
@@ -362,35 +384,24 @@ func TestPodHandler_Handle_CustomMountPath(t *testing.T) {
 		},
 	}
 
-	patch, err := handler.createPatch(pod, "test-secret", "/custom/path")
+	err := handler.mutatePod(pod, "test-secret", "/custom/path")
 	if err != nil {
-		t.Fatalf("createPatch() error = %v", err)
+		t.Fatalf("mutatePod() error = %v", err)
 	}
 
-	// Verify patch contains custom mount path
-	var patches []map[string]interface{}
-	if err := json.Unmarshal(patch, &patches); err != nil {
-		t.Fatalf("Failed to unmarshal patch: %v", err)
-	}
-
+	// Verify custom mount path was set
 	foundMountPath := false
-	for _, p := range patches {
-		if path, ok := p["path"].(string); ok && path == "/spec/containers/0/volumeMounts" {
-			if value, ok := p["value"].([]interface{}); ok {
-				for _, vm := range value {
-					if vmMap, ok := vm.(map[string]interface{}); ok {
-						if mp, ok := vmMap["mountPath"].(string); ok && mp == "/custom/path" {
-							foundMountPath = true
-							break
-						}
-					}
-				}
+	for _, container := range pod.Spec.Containers {
+		for _, mount := range container.VolumeMounts {
+			if mount.Name == "zen-secrets" && mount.MountPath == "/custom/path" {
+				foundMountPath = true
+				break
 			}
 		}
 	}
 
 	if !foundMountPath {
-		t.Error("Expected patch to contain custom mount path")
+		t.Error("Expected mutatePod to set custom mount path")
 	}
 }
 
@@ -407,31 +418,26 @@ func TestPodHandler_Handle_MultipleContainers(t *testing.T) {
 		},
 	}
 
-	patch, err := handler.createPatch(pod, "test-secret", "/zen-secrets")
+	err := handler.mutatePod(pod, "test-secret", "/zen-secrets")
 	if err != nil {
-		t.Fatalf("createPatch() error = %v", err)
+		t.Fatalf("mutatePod() error = %v", err)
 	}
 
-	// Verify patch adds volume mounts to all containers
-	var patches []map[string]interface{}
-	if err := json.Unmarshal(patch, &patches); err != nil {
-		t.Fatalf("Failed to unmarshal patch: %v", err)
+	// Verify volume mounts were added to all containers
+	if len(pod.Spec.Containers) != 3 {
+		t.Fatalf("Expected 3 containers, got %d", len(pod.Spec.Containers))
 	}
 
-	containerMounts := make(map[int]bool)
-	for _, p := range patches {
-		if path, ok := p["path"].(string); ok {
-			// Check for container volume mount paths
-			for i := 0; i < 3; i++ {
-				expectedPath := fmt.Sprintf("/spec/containers/%d/volumeMounts", i)
-				if path == expectedPath {
-					containerMounts[i] = true
-				}
+	for i, container := range pod.Spec.Containers {
+		foundMount := false
+		for _, mount := range container.VolumeMounts {
+			if mount.Name == "zen-secrets" {
+				foundMount = true
+				break
 			}
 		}
-	}
-
-	if len(containerMounts) != 3 {
-		t.Errorf("Expected volume mounts for all 3 containers, got %d", len(containerMounts))
+		if !foundMount {
+			t.Errorf("Expected volume mount for container %d (%s), but not found", i, container.Name)
+		}
 	}
 }

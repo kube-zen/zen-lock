@@ -36,6 +36,9 @@ spec:
                   properties:
                     kind:
                       type: string
+                      enum:
+                      - ServiceAccount
+                      description: "Kind of subject. Currently only ServiceAccount is supported."
                     name:
                       type: string
                     namespace:
