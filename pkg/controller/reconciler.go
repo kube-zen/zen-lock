@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -13,8 +14,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/common"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
+	"github.com/kube-zen/zen-lock/pkg/webhook"
 )
 
 // ZenLockReconciler reconciles a ZenLock object
@@ -42,8 +45,14 @@ func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLoc
 	}, nil
 }
 
-//+kubebuilder:rbac:groups=security.kube-zen.io,resources=zenlocks,verbs=get;list;watch
+//+kubebuilder:rbac:groups=security.kube-zen.io,resources=zenlocks,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=security.kube-zen.io,resources=zenlocks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=security.kube-zen.io,resources=zenlocks/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;delete
+
+const (
+	zenLockFinalizer = "zenlocks.security.kube-zen.io/finalizer"
+)
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -54,6 +63,22 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	zenlock := &securityv1alpha1.ZenLock{}
 	if err := r.Get(ctx, req.NamespacedName, zenlock); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Handle deletion
+	if !zenlock.DeletionTimestamp.IsZero() {
+		return r.handleDeletion(ctx, zenlock, logger, startTime, req)
+	}
+
+	// Add finalizer if not present
+	if !containsString(zenlock.Finalizers, zenLockFinalizer) {
+		zenlock.Finalizers = append(zenlock.Finalizers, zenLockFinalizer)
+		if err := r.Update(ctx, zenlock); err != nil {
+			logger.Error(err, "Failed to add finalizer")
+			return ctrl.Result{}, err
+		}
+		// Requeue to continue reconciliation
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Load private key
@@ -82,6 +107,9 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Record successful decryption
 	metrics.RecordDecryption(req.Namespace, req.Name, "success", decryptDuration)
 
+	// Invalidate cache when ZenLock is updated (to ensure webhook uses fresh data)
+	webhook.InvalidateZenLock(req.NamespacedName)
+
 	// Update status to Ready
 	r.updateStatus(ctx, zenlock, "Ready", "KeyValid", "Private key loaded and decryption successful")
 
@@ -90,6 +118,72 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	metrics.RecordReconcile(req.Namespace, req.Name, "success", duration)
 
 	return ctrl.Result{}, nil
+}
+
+// handleDeletion handles ZenLock deletion by cleaning up associated Secrets
+func (r *ZenLockReconciler) handleDeletion(ctx context.Context, zenlock *securityv1alpha1.ZenLock, logger interface {
+	Info(string, ...interface{})
+	Error(error, string, ...interface{})
+}, startTime time.Time, req ctrl.Request) (ctrl.Result, error) {
+	if !containsString(zenlock.Finalizers, zenLockFinalizer) {
+		// Finalizer already removed, nothing to do
+		return ctrl.Result{}, nil
+	}
+
+	logger.Info("ZenLock is being deleted, cleaning up associated Secrets")
+
+	// List all Secrets with the ZenLock label
+	secretList := &corev1.SecretList{}
+	if err := r.List(ctx, secretList, client.MatchingLabels{
+		common.LabelZenLockName: zenlock.Name,
+	}); err != nil {
+		logger.Error(err, "Failed to list Secrets for cleanup")
+		return ctrl.Result{}, err
+	}
+
+	// Delete all associated Secrets
+	for _, secret := range secretList.Items {
+		if secret.Namespace == zenlock.Namespace {
+			if err := r.Delete(ctx, &secret); err != nil {
+				logger.Error(err, "Failed to delete Secret", "secret", secret.Name)
+				// Continue with other secrets
+			} else {
+				logger.Info("Deleted Secret", "secret", secret.Name)
+			}
+		}
+	}
+
+	// Remove finalizer
+	zenlock.Finalizers = removeString(zenlock.Finalizers, zenLockFinalizer)
+	if err := r.Update(ctx, zenlock); err != nil {
+		logger.Error(err, "Failed to remove finalizer")
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("ZenLock deletion complete")
+	duration := time.Since(startTime).Seconds()
+	metrics.RecordReconcile(req.Namespace, req.Name, "success", duration)
+	return ctrl.Result{}, nil
+}
+
+// Helper functions for finalizer management
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) []string {
+	var result []string
+	for _, item := range slice {
+		if item != s {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 // updateStatus updates the ZenLock status

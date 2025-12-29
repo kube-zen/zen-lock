@@ -93,6 +93,8 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 		}
 	}
 	cache := NewZenLockCache(cacheTTL)
+	// Register cache for invalidation
+	RegisterCache(cache)
 
 	return &PodHandler{
 		Client:     client,
