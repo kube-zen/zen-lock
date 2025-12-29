@@ -95,9 +95,8 @@ func TestPodHandler_Handle_SecretAlreadyExists_Stale(t *testing.T) {
 
 	// Should update the stale secret (may fail on decryption but update path is tested)
 	// We're mainly testing that the AlreadyExists path with stale data is executed
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but stale secret update path was executed
-	}
+	// Error is expected due to invalid ciphertext, but stale secret update path was executed
+	_ = resp.Result
 }
 
 func TestPodHandler_Handle_SecretAlreadyExists_Matching(t *testing.T) {

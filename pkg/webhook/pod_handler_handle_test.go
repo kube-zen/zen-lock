@@ -253,10 +253,9 @@ func TestPodHandler_Handle_DryRun(t *testing.T) {
 	// Dry-run should still allow the request (mutation happens but no Secret created)
 	// The response should contain a patch, but may fail on decryption with invalid ciphertext
 	// We're mainly testing that the dry-run path is executed
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but dry-run path was executed
-		// The important thing is that we tested the dry-run branch
-	}
+	// Error is expected due to invalid ciphertext, but dry-run path was executed
+	// The important thing is that we tested the dry-run branch
+	_ = resp.Result
 }
 
 func TestPodHandler_Handle_CacheHit(t *testing.T) {
@@ -310,8 +309,7 @@ func TestPodHandler_Handle_CacheHit(t *testing.T) {
 
 	// Should use cache and still process (may fail on decryption but cache path is tested)
 	// We're mainly testing that cache hit path is executed
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but cache path was executed
-	}
+	// Error is expected due to invalid ciphertext, but cache path was executed
+	_ = resp.Result
 }
 

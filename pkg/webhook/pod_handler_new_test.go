@@ -62,19 +62,19 @@ func TestNewPodHandler(t *testing.T) {
 		t.Fatalf("Failed to create PodHandler: %v", err)
 	}
 	if handler == nil {
-		t.Error("PodHandler should not be nil")
+		t.Fatal("PodHandler should not be nil")
 	}
 	if handler.Client == nil {
-		t.Error("PodHandler.Client should not be nil")
+		t.Fatal("PodHandler.Client should not be nil")
 	}
 	if handler.crypto == nil {
-		t.Error("PodHandler.crypto should not be nil")
+		t.Fatal("PodHandler.crypto should not be nil")
 	}
 	if handler.privateKey == "" {
-		t.Error("PodHandler.privateKey should not be empty")
+		t.Fatal("PodHandler.privateKey should not be empty")
 	}
 	if handler.cache == nil {
-		t.Error("PodHandler.cache should not be nil")
+		t.Fatal("PodHandler.cache should not be nil")
 	}
 
 	// Test with custom cache TTL
