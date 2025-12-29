@@ -277,7 +277,7 @@ func TestEphemeralSecretCleanup_Integration(t *testing.T) {
 			Labels: map[string]string{
 				"zen-lock.security.kube-zen.io/pod-name":      pod.Name,
 				"zen-lock.security.kube-zen.io/pod-namespace": "default",
-				"zen-lock.security.kube-zen.io/zenlock-name": "test-secret",
+				"zen-lock.security.kube-zen.io/zenlock-name":  "test-secret",
 			},
 		},
 		Data: map[string][]byte{

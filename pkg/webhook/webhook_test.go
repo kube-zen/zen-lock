@@ -35,4 +35,3 @@ func TestSetupWebhookWithManager_NoPrivateKey(t *testing.T) {
 	// Real integration tests should cover SetupWebhookWithManager functionality
 	t.Skip("SetupWebhookWithManager requires envtest - covered in integration tests")
 }
-

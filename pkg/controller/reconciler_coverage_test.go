@@ -64,8 +64,8 @@ func TestZenLockReconciler_Reconcile_SuccessfulDecryption(t *testing.T) {
 
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-zenlock",
-			Namespace: "default",
+			Name:       "test-zenlock",
+			Namespace:  "default",
 			Finalizers: []string{zenLockFinalizer}, // Pre-add finalizer
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
@@ -242,4 +242,3 @@ func TestUpdateStatus_NoStatusChange_Coverage(t *testing.T) {
 		t.Error("Expected LastTransitionTime to be preserved when status doesn't change")
 	}
 }
-

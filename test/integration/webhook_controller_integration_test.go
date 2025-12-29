@@ -199,8 +199,8 @@ func TestSecretReconciler_OrphanCleanup_Integration(t *testing.T) {
 	oldTime := metav1.NewTime(time.Now().Add(-2 * time.Hour)) // 2 hours old
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "zen-lock-inject-default-orphan-pod-abc123",
-			Namespace: "default",
+			Name:              "zen-lock-inject-default-orphan-pod-abc123",
+			Namespace:         "default",
 			CreationTimestamp: oldTime,
 			Labels: map[string]string{
 				common.LabelPodName:      "orphan-pod",
@@ -303,8 +303,8 @@ func TestWebhook_StaleSecretRefresh_Integration(t *testing.T) {
 			Namespace: "default",
 			Labels: map[string]string{
 				common.LabelPodName:      "test-pod",
-				common.LabelPodNamespace:  "default",
-				common.LabelZenLockName:   "test-zenlock",
+				common.LabelPodNamespace: "default",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 		},
 		Data: map[string][]byte{
@@ -756,8 +756,8 @@ func TestSecretReconciler_RequeueWhenPodNotReady_Integration(t *testing.T) {
 	// Create Secret with labels but Pod doesn't exist yet (new Secret, Pod might be created soon)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "zen-lock-inject-default-new-pod-abc123",
-			Namespace: "default",
+			Name:              "zen-lock-inject-default-new-pod-abc123",
+			Namespace:         "default",
 			CreationTimestamp: metav1.Now(), // New secret
 			Labels: map[string]string{
 				common.LabelPodName:      "new-pod",
@@ -797,4 +797,3 @@ func TestSecretReconciler_RequeueWhenPodNotReady_Integration(t *testing.T) {
 		t.Errorf("Expected Secret to still exist, got error: %v", err)
 	}
 }
-

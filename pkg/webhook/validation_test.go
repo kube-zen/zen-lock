@@ -143,10 +143,10 @@ func TestValidateMountPath(t *testing.T) {
 
 func TestSanitizeError(t *testing.T) {
 	tests := []struct {
-		name     string
-		err      error
+		name      string
+		err       error
 		operation string
-		check    func(string) bool
+		check     func(string) bool
 	}{
 		{
 			name:      "removes paths",
@@ -197,9 +197,9 @@ func (e *testError) Error() string {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		containsMiddle(s, substr))))
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsMiddle(s, substr))))
 }
 
 func containsMiddle(s, substr string) bool {
@@ -210,4 +210,3 @@ func containsMiddle(s, substr string) bool {
 	}
 	return false
 }
-

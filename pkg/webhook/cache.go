@@ -60,7 +60,7 @@ func (c *ZenLockCache) Get(key types.NamespacedName) (*securityv1alpha1.ZenLock,
 	if c == nil {
 		return nil, false
 	}
-	
+
 	c.mu.RLock()
 	entry, exists := c.cache[key]
 	if !exists {
@@ -152,4 +152,3 @@ func (c *ZenLockCache) Size() int {
 	defer c.mu.RUnlock()
 	return len(c.cache)
 }
-

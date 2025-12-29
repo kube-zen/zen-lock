@@ -39,4 +39,3 @@ func TestUpdateCacheMetrics(t *testing.T) {
 	// Test with large numbers
 	UpdateCacheMetrics(100, 75, 25)
 }
-

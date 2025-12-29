@@ -183,4 +183,3 @@ func TestInvalidateAll(t *testing.T) {
 		t.Error("Expected cache2 key2 to be invalidated")
 	}
 }
-

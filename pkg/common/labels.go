@@ -20,11 +20,10 @@ package common
 const (
 	// LabelPodName identifies the Pod name associated with a zen-lock Secret
 	LabelPodName = "zen-lock.security.kube-zen.io/pod-name"
-	
+
 	// LabelPodNamespace identifies the Pod namespace associated with a zen-lock Secret
 	LabelPodNamespace = "zen-lock.security.kube-zen.io/pod-namespace"
-	
+
 	// LabelZenLockName identifies the ZenLock CRD name associated with a zen-lock Secret
 	LabelZenLockName = "zen-lock.security.kube-zen.io/zenlock-name"
 )
-

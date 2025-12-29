@@ -234,7 +234,7 @@ func TestZenLockCache_Size(t *testing.T) {
 
 func TestZenLockCache_Stop(t *testing.T) {
 	cache := NewZenLockCache(100 * time.Millisecond)
-	
+
 	key := types.NamespacedName{Namespace: "default", Name: "test-zenlock"}
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-zenlock", Namespace: "default"},
@@ -280,4 +280,3 @@ func TestZenLockCache_Expiration(t *testing.T) {
 		t.Error("Expected cache miss after expiration")
 	}
 }
-

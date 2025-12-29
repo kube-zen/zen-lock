@@ -23,13 +23,13 @@ import (
 
 func TestAgeEncryptor_Encrypt_RealKey(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	// Use a properly formatted test public key (age format)
 	// This is a test key - in real usage, generate with zen-lock keygen
 	testPublicKey := "age1qyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3290u3"
-	
+
 	plaintext := []byte("test secret data")
-	
+
 	// Encrypt
 	ciphertext, err := encryptor.Encrypt(plaintext, []string{testPublicKey})
 	if err != nil {
@@ -37,11 +37,11 @@ func TestAgeEncryptor_Encrypt_RealKey(t *testing.T) {
 		t.Skipf("Encrypt failed (may need valid key): %v", err)
 		return
 	}
-	
+
 	if len(ciphertext) == 0 {
 		t.Error("Ciphertext should not be empty")
 	}
-	
+
 	// Verify ciphertext is base64-encodable (for storage)
 	base64Ciphertext := base64.StdEncoding.EncodeToString(ciphertext)
 	if base64Ciphertext == "" {
@@ -51,21 +51,21 @@ func TestAgeEncryptor_Encrypt_RealKey(t *testing.T) {
 
 func TestAgeEncryptor_Decrypt_RealKey(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	// Use a properly formatted test key pair
 	// In real usage, these would be generated with zen-lock keygen
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
 	testPublicKey := "age1qyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3290u3"
-	
+
 	plaintext := []byte("test secret data")
-	
+
 	// First encrypt
 	ciphertext, err := encryptor.Encrypt(plaintext, []string{testPublicKey})
 	if err != nil {
 		t.Skipf("Encrypt failed (may need valid key): %v", err)
 		return
 	}
-	
+
 	// Then decrypt
 	decrypted, err := encryptor.Decrypt(ciphertext, testPrivateKey)
 	if err != nil {
@@ -73,7 +73,7 @@ func TestAgeEncryptor_Decrypt_RealKey(t *testing.T) {
 		t.Logf("Decrypt returned error (expected for test keys): %v", err)
 		return
 	}
-	
+
 	if string(decrypted) != string(plaintext) {
 		t.Errorf("Decrypted text doesn't match: got %s, want %s", string(decrypted), string(plaintext))
 	}
@@ -81,12 +81,12 @@ func TestAgeEncryptor_Decrypt_RealKey(t *testing.T) {
 
 func TestAgeEncryptor_Decrypt_InvalidCiphertext(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
-	
+
 	// Test with invalid ciphertext
 	invalidCiphertext := []byte("not-a-valid-age-ciphertext")
-	
+
 	_, err := encryptor.Decrypt(invalidCiphertext, testPrivateKey)
 	if err == nil {
 		t.Error("Decrypt should return error for invalid ciphertext")
@@ -95,9 +95,9 @@ func TestAgeEncryptor_Decrypt_InvalidCiphertext(t *testing.T) {
 
 func TestAgeEncryptor_Decrypt_EmptyCiphertext(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
-	
+
 	// Test with empty ciphertext
 	_, err := encryptor.Decrypt([]byte{}, testPrivateKey)
 	if err == nil {
@@ -107,9 +107,9 @@ func TestAgeEncryptor_Decrypt_EmptyCiphertext(t *testing.T) {
 
 func TestAgeEncryptor_DecryptMap_EmptyMap(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
-	
+
 	// Test with empty map
 	emptyMap := map[string]string{}
 	result, err := encryptor.DecryptMap(emptyMap, testPrivateKey)
@@ -126,9 +126,9 @@ func TestAgeEncryptor_DecryptMap_EmptyMap(t *testing.T) {
 
 func TestAgeEncryptor_DecryptMap_InvalidEntries(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
-	
+
 	// Test with invalid base64
 	invalidMap := map[string]string{
 		"key1": "not-valid-base64!!!",
@@ -137,7 +137,7 @@ func TestAgeEncryptor_DecryptMap_InvalidEntries(t *testing.T) {
 	if err == nil {
 		t.Error("DecryptMap should return error for invalid base64")
 	}
-	
+
 	// Test with valid base64 but invalid ciphertext
 	validBase64 := base64.StdEncoding.EncodeToString([]byte("not-age-ciphertext"))
 	invalidMap2 := map[string]string{
@@ -148,4 +148,3 @@ func TestAgeEncryptor_DecryptMap_InvalidEntries(t *testing.T) {
 		t.Error("DecryptMap should return error for invalid ciphertext")
 	}
 }
-

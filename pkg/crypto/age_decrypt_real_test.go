@@ -118,4 +118,3 @@ func mustEncrypt(t *testing.T, encryptor *AgeEncryptor, plaintext []byte, public
 	}
 	return ciphertext
 }
-

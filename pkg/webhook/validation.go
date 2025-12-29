@@ -108,4 +108,3 @@ func SanitizeError(err error, operation string) error {
 	// Generic error message
 	return fmt.Errorf("%s failed: %s", operation, errMsg)
 }
-

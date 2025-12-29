@@ -47,7 +47,7 @@ func NewRateLimiter(maxTokens int, refillInterval time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		tokens:     make(map[string]*tokenBucket),
 		maxTokens:  maxTokens,
-		refillRate:  refillInterval,
+		refillRate: refillInterval,
 		stopCh:     make(chan struct{}),
 	}
 
@@ -169,4 +169,3 @@ func (rl *RateLimiter) RateLimitMiddleware(next func(http.ResponseWriter, *http.
 		next(w, r)
 	}
 }
-

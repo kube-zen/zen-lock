@@ -32,8 +32,8 @@ import (
 
 // ZenLockValidatorHandler is an admission handler that validates ZenLock CRDs
 type ZenLockValidatorHandler struct {
-	decoder    admission.Decoder
-	validator  *ZenLockValidator
+	decoder   admission.Decoder
+	validator *ZenLockValidator
 }
 
 // ZenLockValidator validates ZenLock CRDs
@@ -152,4 +152,3 @@ func (v *ZenLockValidator) validateZenLock(zenlock *securityv1alpha1.ZenLock) er
 
 	return nil
 }
-
