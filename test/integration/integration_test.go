@@ -115,8 +115,18 @@ func TestZenLockReconciler_Integration(t *testing.T) {
 		t.Errorf("Reconcile() error = %v", err)
 	}
 
+	// First reconcile may requeue due to finalizer addition
 	if result.Requeue {
-		t.Error("Reconcile() should not requeue")
+		// Simulate second reconcile after finalizer is added
+		result, err = reconciler.Reconcile(ctx, req)
+		if err != nil {
+			t.Errorf("Second Reconcile() error = %v", err)
+			return
+		}
+	}
+
+	if result.Requeue {
+		t.Error("Reconcile() should not requeue after finalizer is added")
 	}
 
 	// Verify ZenLock still exists
