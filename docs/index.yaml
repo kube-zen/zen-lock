@@ -5,9 +5,9 @@ entries:
       category: Security
     apiVersion: v2
     appVersion: 0.0.1-alpha
-    created: "2025-12-29T06:42:12.230564849Z"
+    created: "2025-12-29T06:47:28.401007362Z"
     description: A Helm chart for zen-lock - Zero-Knowledge secret manager for Kubernetes
-    digest: 2a100d1bc32e1749714d251b0fe59fa67db7778147c0d079f079d960f9e2bd86
+    digest: 24918e5ac4c0af26a54f2798cdaec76d0cf5f1932c4ccaf2b18b37f4e3390a17
     home: https://github.com/kube-zen/zen-lock
     keywords:
     - kubernetes
@@ -25,4 +25,4 @@ entries:
     urls:
     - https://kube-zen.github.io/zen-lock/zen-lock-0.0.1-alpha.tgz
     version: 0.0.1-alpha
-generated: "2025-12-29T06:42:12.229747033Z"
+generated: "2025-12-29T06:47:28.400151791Z"
