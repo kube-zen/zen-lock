@@ -42,9 +42,8 @@ func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLoc
 	}, nil
 }
 
-//+kubebuilder:rbac:groups=security.zen.io,resources=zenlocks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=security.zen.io,resources=zenlocks,verbs=get;list;watch
 //+kubebuilder:rbac:groups=security.zen.io,resources=zenlocks/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=security.zen.io,resources=zenlocks/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

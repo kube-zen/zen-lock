@@ -44,10 +44,24 @@ func GenerateSecretName(namespace, podName string) string {
 	secretNameBase := fmt.Sprintf("zen-lock-inject-%s-%s", namespace, podName)
 	hash := sha256.Sum256([]byte(secretNameBase))
 	hashStr := hex.EncodeToString(hash[:])[:16] // Use first 16 chars of hash
-	secretName := fmt.Sprintf("zen-lock-inject-%s-%s-%s", namespace, podName, hashStr)
+
+	// Build name with hash suffix: zen-lock-inject-<namespace>-<podName>-<hash>
+	// Hash suffix is critical for uniqueness, so we preserve it even when truncating
+	prefix := fmt.Sprintf("zen-lock-inject-%s-%s-", namespace, podName)
+	secretName := prefix + hashStr
+
 	// Ensure name is valid (max 253 chars, lowercase alphanumeric + dash)
+	// If truncation is needed, preserve hash suffix and truncate prefix
 	if len(secretName) > 253 {
-		secretName = secretName[:253]
+		maxPrefixLen := 253 - len(hashStr) - 1 // -1 for dash
+		if maxPrefixLen < len("zen-lock-inject-") {
+			// Extreme case: use minimal prefix + full hash
+			secretName = fmt.Sprintf("zl-%s", hashStr)
+		} else {
+			// Truncate prefix, preserve hash
+			truncatedPrefix := prefix[:maxPrefixLen]
+			secretName = truncatedPrefix + hashStr
+		}
 	}
 	return secretName
 }
@@ -180,6 +194,11 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 				metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 				return admission.Errored(http.StatusInternalServerError,
 					fmt.Errorf("failed to fetch existing secret for validation: %w", err))
+			}
+
+			// Ensure labels map is initialized (defense against nil labels from legacy/collision Secrets)
+			if existingSecret.Labels == nil {
+				existingSecret.Labels = make(map[string]string)
 			}
 
 			// Check if existing secret matches current ZenLock (by comparing ZenLock name label)

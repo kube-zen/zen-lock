@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -20,23 +21,36 @@ const (
 	labelPodName      = "zen-lock.security.zen.io/pod-name"
 	labelPodNamespace = "zen-lock.security.zen.io/pod-namespace"
 	labelZenLockName  = "zen-lock.security.zen.io/zenlock-name"
+
+	// DefaultOrphanTTL is the default time after which an orphaned Secret (Pod not found) is deleted
+	// This is configurable via environment variable ZEN_LOCK_ORPHAN_TTL (duration string, e.g., "10m")
+	// Default: 15 minutes (safer for slow control planes and high-latency clusters)
+	DefaultOrphanTTL = 15 * time.Minute
 )
 
 // SecretReconciler reconciles Secrets created by the webhook to set OwnerReferences
 type SecretReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme    *runtime.Scheme
+	OrphanTTL time.Duration // Time after which orphaned Secrets are deleted
 }
 
 // NewSecretReconciler creates a new SecretReconciler
 func NewSecretReconciler(client client.Client, scheme *runtime.Scheme) *SecretReconciler {
+	orphanTTL := DefaultOrphanTTL
+	if ttlStr := os.Getenv("ZEN_LOCK_ORPHAN_TTL"); ttlStr != "" {
+		if parsedTTL, err := time.ParseDuration(ttlStr); err == nil {
+			orphanTTL = parsedTTL
+		}
+	}
 	return &SecretReconciler{
-		Client: client,
-		Scheme: scheme,
+		Client:    client,
+		Scheme:    scheme,
+		OrphanTTL: orphanTTL,
 	}
 }
 
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 
 // Reconcile sets OwnerReference on zen-lock Secrets when the Pod exists
@@ -73,9 +87,9 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// Pod doesn't exist - check if this is a stale/orphaned secret
 		if k8serrors.IsNotFound(err) {
 			// Check if Secret has been orphaned for a while (no OwnerReference means Pod was never created or was deleted)
-			// If Secret is old enough (created more than 1 minute ago), it's likely orphaned
+			// If Secret is old enough (older than OrphanTTL), it's likely orphaned
 			secretAge := time.Since(secret.CreationTimestamp.Time)
-			if secretAge > 1*time.Minute {
+			if secretAge > r.OrphanTTL {
 				// Secret is orphaned - delete it
 				logger.Info("Deleting orphaned zen-lock secret (Pod not found)", "secret", req.NamespacedName, "pod", podKey, "age", secretAge)
 				if err := r.Delete(ctx, secret); err != nil {

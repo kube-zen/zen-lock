@@ -208,8 +208,8 @@ func TestSecretReconciler_DeletesOrphanedSecret(t *testing.T) {
 	reconciler, clientBuilder := setupSecretReconciler(t)
 
 	// Create Secret with zen-lock labels but Pod doesn't exist
-	// Use an old timestamp so it will be deleted as orphaned
-	oldTime := metav1.NewTime(time.Now().Add(-2 * time.Minute)) // 2 minutes ago
+	// Use an old timestamp so it will be deleted as orphaned (older than default 15min TTL)
+	oldTime := metav1.NewTime(time.Now().Add(-20 * time.Minute)) // 20 minutes ago
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "zen-lock-secret",

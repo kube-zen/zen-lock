@@ -12,10 +12,10 @@ rules:
   - apiGroups: ["security.zen.io"]
     resources: ["zenlocks/status"]
     verbs: ["get", "update", "patch"]
-  # Secrets: Update to set OwnerReferences (created by webhook)
+  # Secrets: Update to set OwnerReferences and delete orphaned secrets
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "watch", "update", "patch"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
   # Pods: Read to get UID for OwnerReference
   - apiGroups: [""]
     resources: ["pods"]
