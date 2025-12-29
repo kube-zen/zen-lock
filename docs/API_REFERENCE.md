@@ -2,14 +2,14 @@
 
 ## ZenLock CRD
 
-### Group: `security.zen.io`
+### Group: `security.kube-zen.io`
 ### Version: `v1alpha1`
 ### Kind: `ZenLock`
 
 ### Spec
 
 ```yaml
-apiVersion: security.zen.io/v1alpha1
+apiVersion: security.kube-zen.io/v1alpha1
 kind: ZenLock
 metadata:
   name: example-secret
@@ -39,7 +39,7 @@ status:
   phase: Ready
   
   # Last key rotation timestamp
-  lastRotation: "2025-01-01T00:00:00Z"
+  lastRotation: "2015-12-28T00:00:00Z"
   
   # Conditions
   conditions:
@@ -47,7 +47,7 @@ status:
     status: "True"
     reason: "KeyValid"
     message: "Private key loaded and decryption successful"
-    lastTransitionTime: "2025-01-01T00:00:00Z"
+    lastTransitionTime: "2015-12-28T00:00:00Z"
 ```
 
 ## Annotations

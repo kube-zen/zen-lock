@@ -65,13 +65,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Create the name of the service account to use
+Create the name of the controller service account to use
 */}}
-{{- define "zen-lock.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "zen-lock.fullname" .) .Values.serviceAccount.name }}
+{{- define "zen-lock.controllerServiceAccountName" -}}
+{{- if and .Values.controller.serviceAccount .Values.controller.serviceAccount.name }}
+{{- .Values.controller.serviceAccount.name }}
 {{- else }}
-{{- default "default" .Values.serviceAccount.name }}
+{{- printf "%s-controller" (include "zen-lock.fullname" .) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create the name of the webhook service account to use
+*/}}
+{{- define "zen-lock.webhookServiceAccountName" -}}
+{{- if and .Values.webhook.serviceAccount .Values.webhook.serviceAccount.name }}
+{{- .Values.webhook.serviceAccount.name }}
+{{- else }}
+{{- printf "%s-webhook" (include "zen-lock.fullname" .) }}
 {{- end }}
 {{- end }}
 

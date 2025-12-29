@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/kube-zen/zen-lock/pkg/common"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -98,9 +100,9 @@ func TestSecretReconciler_SetsOwnerReferenceWhenPodExists(t *testing.T) {
 			Name:      "zen-lock-secret",
 			Namespace: "default",
 			Labels: map[string]string{
-				labelPodName:      "test-pod",
-				labelPodNamespace: "default",
-				labelZenLockName:  "test-zenlock",
+				common.LabelPodName:      "test-pod",
+				common.LabelPodNamespace: "default",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 		},
 		Data: map[string][]byte{
@@ -164,9 +166,9 @@ func TestSecretReconciler_RequeuesWhenPodNotExists(t *testing.T) {
 			Name:      "zen-lock-secret",
 			Namespace: "default",
 			Labels: map[string]string{
-				labelPodName:      "non-existent-pod",
-				labelPodNamespace: "default",
-				labelZenLockName:  "test-zenlock",
+				common.LabelPodName:      "non-existent-pod",
+				common.LabelPodNamespace: "default",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 			CreationTimestamp: metav1.Now(), // Recent timestamp
 		},
@@ -215,9 +217,9 @@ func TestSecretReconciler_DeletesOrphanedSecret(t *testing.T) {
 			Name:      "zen-lock-secret",
 			Namespace: "default",
 			Labels: map[string]string{
-				labelPodName:      "non-existent-pod",
-				labelPodNamespace: "default",
-				labelZenLockName:  "test-zenlock",
+				common.LabelPodName:      "non-existent-pod",
+				common.LabelPodNamespace: "default",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 			CreationTimestamp: oldTime, // Old timestamp
 		},
@@ -278,9 +280,9 @@ func TestSecretReconciler_RequeuesWhenPodHasNoUID(t *testing.T) {
 			Name:      "zen-lock-secret",
 			Namespace: "default",
 			Labels: map[string]string{
-				labelPodName:      "test-pod",
-				labelPodNamespace: "default",
-				labelZenLockName:  "test-zenlock",
+				common.LabelPodName:      "test-pod",
+				common.LabelPodNamespace: "default",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 		},
 		Data: map[string][]byte{
@@ -341,9 +343,9 @@ func TestSecretReconciler_SkipsWhenOwnerReferenceExists(t *testing.T) {
 			Name:      "zen-lock-secret",
 			Namespace: "default",
 			Labels: map[string]string{
-				labelPodName:      "test-pod",
-				labelPodNamespace: "default",
-				labelZenLockName:  "test-zenlock",
+				common.LabelPodName:      "test-pod",
+				common.LabelPodNamespace: "default",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{

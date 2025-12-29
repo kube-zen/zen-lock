@@ -16,7 +16,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
 )
@@ -36,6 +36,8 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var certDir string
+	var enableController bool
+	var enableWebhook bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -44,6 +46,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&certDir, "cert-dir", "/tmp/k8s-webhook-server/serving-certs",
 		"The directory where cert-manager injects the TLS certificates.")
+	flag.BoolVar(&enableController, "enable-controller", true,
+		"Enable the controller (ZenLock and Secret reconcilers).")
+	flag.BoolVar(&enableWebhook, "enable-webhook", true,
+		"Enable the mutating admission webhook.")
 
 	opts := zap.Options{
 		Development: true,
@@ -77,27 +83,43 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup ZenLock controller
-	zenlockReconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
-	if err != nil {
-		setupLog.Error(err, "unable to create ZenLock reconciler")
-		os.Exit(1)
-	}
-	if err := zenlockReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup ZenLock controller")
-		os.Exit(1)
+	// Setup ZenLock controller (if enabled)
+	if enableController {
+		zenlockReconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
+		if err != nil {
+			setupLog.Error(err, "unable to create ZenLock reconciler")
+			os.Exit(1)
+		}
+		if err := zenlockReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to setup ZenLock controller")
+			os.Exit(1)
+		}
+
+		// Setup Secret controller (sets OwnerReferences on webhook-created Secrets)
+		secretReconciler := controller.NewSecretReconciler(mgr.GetClient(), mgr.GetScheme())
+		if err := secretReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to setup Secret controller")
+			os.Exit(1)
+		}
+		setupLog.Info("Controller enabled")
+	} else {
+		setupLog.Info("Controller disabled")
 	}
 
-	// Setup Secret controller (sets OwnerReferences on webhook-created Secrets)
-	secretReconciler := controller.NewSecretReconciler(mgr.GetClient(), mgr.GetScheme())
-	if err := secretReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup Secret controller")
-		os.Exit(1)
+	// Setup webhook (if enabled)
+	if enableWebhook {
+		if err := webhookpkg.SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to setup webhook")
+			os.Exit(1)
+		}
+		setupLog.Info("Webhook enabled")
+	} else {
+		setupLog.Info("Webhook disabled")
 	}
 
-	// Setup webhook
-	if err := webhookpkg.SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup webhook")
+	// Ensure at least one component is enabled
+	if !enableController && !enableWebhook {
+		setupLog.Error(fmt.Errorf("at least one of --enable-controller or --enable-webhook must be true"), "invalid configuration")
 		os.Exit(1)
 	}
 

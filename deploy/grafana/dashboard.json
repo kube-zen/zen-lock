@@ -315,6 +315,82 @@
             }
           }
         ]
+      },
+      {
+        "id": 12,
+        "title": "Cache Hit Rate",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 36},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_cache_hits_total[5m])) / (sum(rate(zenlock_cache_hits_total[5m])) + sum(rate(zenlock_cache_misses_total[5m]))) * 100",
+            "legendFormat": "Cache Hit Rate (%)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 50, "color": "yellow"},
+                {"value": 80, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Cache Hits vs Misses",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_cache_hits_total[5m])) by (namespace, zenlock_name)",
+            "legendFormat": "Hits - {{namespace}}/{{zenlock_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_cache_misses_total[5m])) by (namespace, zenlock_name)",
+            "legendFormat": "Misses - {{namespace}}/{{zenlock_name}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Cache Operations/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Webhook Validation Failures",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_webhook_validation_failures_total[5m])) by (namespace, reason)",
+            "legendFormat": "{{namespace}} - {{reason}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Failures/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
       }
     ]
   }

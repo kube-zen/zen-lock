@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zen-lock-controller
+  namespace: zen-lock-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zen-lock-controller
+  namespace: zen-lock-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zen-lock-controller
+  template:
+    metadata:
+      labels:
+        app: zen-lock-controller
+    spec:
+      serviceAccountName: zen-lock-controller
+      containers:
+      - name: controller
+        image: kube-zen/zen-lock-webhook:latest
+        imagePullPolicy: IfNotPresent
+        args:
+        - --metrics-bind-address=:8080
+        - --health-probe-bind-address=:8081
+        - --leader-elect=true
+        - --enable-controller=true
+        - --enable-webhook=false
+        env:
+        - name: ZEN_LOCK_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zen-lock-master-key
+              key: key.txt
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+

@@ -2,6 +2,12 @@
 
 This document outlines security best practices for using zen-lock in production environments.
 
+**Note on Production Readiness**: zen-lock is production-ready for operational concerns (HA, leader election, observability). Some security features are planned for future versions:
+- **v0.2.0**: KMS integration (AWS KMS, GCP KMS, Azure Key Vault), multi-tenancy (per-namespace keys)
+- **v1.0.0**: Automated key rotation, secret versioning, audit logging integration
+
+See [ROADMAP.md](../ROADMAP.md) for complete feature plans.
+
 ## Table of Contents
 
 1. [Security Model](#security-model)
@@ -181,7 +187,7 @@ kubectl create secret generic zen-lock-master-key-v2 \
 **Always use AllowedSubjects for production secrets:**
 
 ```yaml
-apiVersion: security.zen.io/v1alpha1
+apiVersion: security.kube-zen.io/v1alpha1
 kind: ZenLock
 metadata:
   name: production-secrets
@@ -206,7 +212,7 @@ kind: ClusterRole
 metadata:
   name: zen-lock-admin
 rules:
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ```
@@ -219,7 +225,7 @@ kind: ClusterRole
 metadata:
   name: zen-lock-reader
 rules:
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch"]
 ```

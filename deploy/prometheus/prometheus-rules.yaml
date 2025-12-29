@@ -16,10 +16,10 @@ kind: PrometheusRule
 metadata:
   name: zen-lock-alerts
   namespace: zen-lock-system
-  labels:
-    app: zen-lock-webhook
-    prometheus: kube-prometheus
-    role: alert-rules
+          labels:
+            app: zen-lock
+            prometheus: kube-prometheus
+            role: alert-rules
 spec:
   groups:
     - name: zen-lock.rules
@@ -27,14 +27,14 @@ spec:
       rules:
         # Alert when zen-lock controller is down
         - alert: ZenLockControllerDown
-          expr: up{job="zen-lock-webhook"} == 0
+          expr: up{job=~"zen-lock-controller|zen-lock-webhook"} == 0
           for: 5m
           labels:
             severity: critical
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
-            summary: "zen-lock Controller is down"
-            description: "zen-lock Controller has been down for more than 5 minutes."
+            summary: "zen-lock component is down"
+            description: "zen-lock controller or webhook has been down for more than 5 minutes."
         
         # Alert on high reconciliation error rate
         - alert: ZenLockHighReconciliationErrorRate
@@ -42,7 +42,7 @@ spec:
           for: 5m
           labels:
             severity: warning
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "High zen-lock reconciliation error rate detected"
             description: >
@@ -54,7 +54,7 @@ spec:
           for: 10m
           labels:
             severity: warning
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "High webhook injection failure rate"
             description: >
@@ -67,7 +67,7 @@ spec:
           for: 5m
           labels:
             severity: info
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "Webhook injection denials detected"
             description: >
@@ -80,7 +80,7 @@ spec:
           for: 10m
           labels:
             severity: warning
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "High decryption failure rate"
             description: >
@@ -96,7 +96,7 @@ spec:
           for: 10m
           labels:
             severity: warning
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "Slow reconciliation detected"
             description: >
@@ -110,7 +110,7 @@ spec:
           for: 10m
           labels:
             severity: warning
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "Slow webhook injection detected"
             description: >
@@ -125,10 +125,23 @@ spec:
           for: 10m
           labels:
             severity: warning
-            component: zen-lock-webhook
+            component: zen-lock
           annotations:
             summary: "Slow decryption detected"
             description: >
               95th percentile decryption duration is high ({{ $value }}s).
               This may indicate issues with the encryption key or ciphertext size.
+        
+        # Alert on high webhook validation failures
+        - alert: ZenLockWebhookValidationFailures
+          expr: rate(zenlock_webhook_validation_failures_total[5m]) > 5
+          for: 5m
+          labels:
+            severity: warning
+            component: zen-lock
+          annotations:
+            summary: "High webhook validation failure rate"
+            description: >
+              zen-lock webhook is experiencing {{ $value }} validation failures per second.
+              Check Pod annotations and mount paths for configuration errors.
 

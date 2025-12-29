@@ -1,32 +1,18 @@
-# Copyright 2025 Kube-ZEN Contributors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-{{- if .Values.webhook.enabled }}
+{{- if .Values.controller.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "zen-lock.fullname" . }}-webhook
+  name: {{ include "zen-lock.fullname" . }}-controller
   namespace: {{ include "zen-lock.namespace" . }}
   labels:
     {{- include "zen-lock.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webhook
+    app.kubernetes.io/component: controller
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.controller.replicaCount | default .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "zen-lock.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: webhook
+      app.kubernetes.io/component: controller
   template:
     metadata:
       annotations:
@@ -35,23 +21,22 @@ spec:
         {{- end }}
       labels:
         {{- include "zen-lock.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: webhook
+        app.kubernetes.io/component: controller
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "zen-lock.webhookServiceAccountName" . }}
+      serviceAccountName: {{ include "zen-lock.controllerServiceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: webhook
+        - name: controller
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - --cert-dir={{ .Values.webhook.certDir }}
             - --metrics-bind-address=:{{ .Values.metrics.port }}
             - --health-probe-bind-address=:8081
             {{- if .Values.leaderElection.enabled }}
@@ -60,32 +45,15 @@ spec:
             {{- else }}
             - --leader-elect=false
             {{- end }}
-            - --enable-controller=false
-            - --enable-webhook=true
+            - --enable-controller=true
+            - --enable-webhook=false
           ports:
-            - name: webhook
-              containerPort: {{ .Values.webhook.port }}
-              protocol: TCP
             - name: metrics
               containerPort: {{ .Values.metrics.port }}
               protocol: TCP
             - name: health
               containerPort: 8081
               protocol: TCP
-          {{- if .Values.webhook.enabled }}
-          volumeMounts:
-            - name: webhook-certs
-              mountPath: {{ .Values.webhook.certDir }}
-              readOnly: true
-            {{- with .Values.extraVolumeMounts }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
-          {{- else }}
-          {{- with .Values.extraVolumeMounts }}
-          volumeMounts:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- end }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -109,20 +77,6 @@ spec:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- if .Values.webhook.enabled }}
-      volumes:
-        - name: webhook-certs
-          secret:
-            secretName: {{ .Values.webhook.certSecret }}
-        {{- with .Values.extraVolumes }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-      {{- else }}
-      {{- with .Values.extraVolumes }}
-      volumes:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

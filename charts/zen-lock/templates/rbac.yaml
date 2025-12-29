@@ -25,10 +25,10 @@ metadata:
     rbac.authorization.k8s.io/justification: "Controller reconciles ZenLocks and updates their status. Also sets OwnerReferences on Secrets created by webhook."
 rules:
   # ZenLock CRD: Read and update status only
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks/status"]
     verbs: ["get", "update", "patch"]
   # Secrets: Update to set OwnerReferences (created by webhook)
@@ -49,6 +49,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch"]
 ---
 # Controller ClusterRoleBinding
+{{- if .Values.controller.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -62,8 +63,9 @@ roleRef:
   name: {{ include "zen-lock.fullname" . }}-controller
 subjects:
   - kind: ServiceAccount
-    name: {{ include "zen-lock.serviceAccountName" . }}
+    name: {{ include "zen-lock.controllerServiceAccountName" . }}
     namespace: {{ include "zen-lock.namespace" . }}
+{{- end }}
 ---
 # Webhook ClusterRole
 # Webhook reads ZenLocks and creates ephemeral Secrets for Pod injection
@@ -78,7 +80,7 @@ metadata:
     rbac.authorization.k8s.io/justification: "Webhook reads ZenLocks and creates ephemeral Secrets for Pod injection. Also refreshes stale secrets."
 rules:
   # ZenLock CRD: Read only (to fetch and decrypt)
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get"]
   # Secrets: Create, get, update (for ephemeral secrets and stale-secret refresh)
@@ -87,6 +89,7 @@ rules:
     verbs: ["create", "get", "update"]
 ---
 # Webhook ClusterRoleBinding
+{{- if .Values.webhook.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -100,5 +103,6 @@ roleRef:
   name: {{ include "zen-lock.fullname" . }}-webhook
 subjects:
   - kind: ServiceAccount
-    name: {{ include "zen-lock.serviceAccountName" . }}
+    name: {{ include "zen-lock.webhookServiceAccountName" . }}
     namespace: {{ include "zen-lock.namespace" . }}
+{{- end }}

@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
@@ -261,9 +261,9 @@ func TestEphemeralSecretCleanup_Integration(t *testing.T) {
 			Name:      "zen-lock-inject-default-test-pod-abc123",
 			Namespace: "default",
 			Labels: map[string]string{
-				"zen-lock.security.zen.io/pod-name":      pod.Name,
-				"zen-lock.security.zen.io/pod-namespace": "default",
-				"zen-lock.security.zen.io/zenlock-name": "test-secret",
+				"zen-lock.security.kube-zen.io/pod-name":      pod.Name,
+				"zen-lock.security.kube-zen.io/pod-namespace": "default",
+				"zen-lock.security.kube-zen.io/zenlock-name": "test-secret",
 			},
 		},
 		Data: map[string][]byte{
@@ -286,11 +286,11 @@ func TestEphemeralSecretCleanup_Integration(t *testing.T) {
 	if retrievedSecret.Labels == nil {
 		t.Error("Expected Secret to have labels")
 	} else {
-		if retrievedSecret.Labels["zen-lock.security.zen.io/pod-name"] != "test-pod" {
-			t.Errorf("Expected pod-name label 'test-pod', got '%s'", retrievedSecret.Labels["zen-lock.security.zen.io/pod-name"])
+		if retrievedSecret.Labels["zen-lock.security.kube-zen.io/pod-name"] != "test-pod" {
+			t.Errorf("Expected pod-name label 'test-pod', got '%s'", retrievedSecret.Labels["zen-lock.security.kube-zen.io/pod-name"])
 		}
-		if retrievedSecret.Labels["zen-lock.security.zen.io/pod-namespace"] != "default" {
-			t.Errorf("Expected pod-namespace label 'default', got '%s'", retrievedSecret.Labels["zen-lock.security.zen.io/pod-namespace"])
+		if retrievedSecret.Labels["zen-lock.security.kube-zen.io/pod-namespace"] != "default" {
+			t.Errorf("Expected pod-namespace label 'default', got '%s'", retrievedSecret.Labels["zen-lock.security.kube-zen.io/pod-namespace"])
 		}
 	}
 

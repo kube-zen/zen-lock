@@ -137,7 +137,7 @@ kubectl label namespace my-namespace zen-lock=enabled
 
 2. Create ZenLock CRD:
    ```yaml
-   apiVersion: security.zen.io/v1alpha1
+   apiVersion: security.kube-zen.io/v1alpha1
    kind: ZenLock
    metadata:
      name: my-secret
@@ -171,7 +171,7 @@ helm uninstall zen-lock --namespace zen-lock-system
 **Note**: This will not delete the CRDs. To remove CRDs:
 
 ```bash
-kubectl delete crd zenlocks.security.zen.io
+kubectl delete crd zenlocks.security.kube-zen.io
 ```
 
 ## Troubleshooting

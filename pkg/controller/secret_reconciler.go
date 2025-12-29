@@ -14,14 +14,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/kube-zen/zen-lock/pkg/common"
 )
 
 const (
-	// Label keys for Secret tracking
-	labelPodName      = "zen-lock.security.zen.io/pod-name"
-	labelPodNamespace = "zen-lock.security.zen.io/pod-namespace"
-	labelZenLockName  = "zen-lock.security.zen.io/zenlock-name"
-
 	// DefaultOrphanTTL is the default time after which an orphaned Secret (Pod not found) is deleted
 	// This is configurable via environment variable ZEN_LOCK_ORPHAN_TTL (duration string, e.g., "10m")
 	// Default: 15 minutes (safer for slow control planes and high-latency clusters)
@@ -64,8 +61,8 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Only process Secrets with zen-lock labels
-	podName, hasPodName := secret.Labels[labelPodName]
-	podNamespace, hasPodNamespace := secret.Labels[labelPodNamespace]
+	podName, hasPodName := secret.Labels[common.LabelPodName]
+	podNamespace, hasPodNamespace := secret.Labels[common.LabelPodNamespace]
 	if !hasPodName || !hasPodNamespace {
 		// Not a zen-lock Secret, ignore
 		return ctrl.Result{}, nil

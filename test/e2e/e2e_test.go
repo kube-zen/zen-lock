@@ -44,7 +44,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
 )
@@ -185,8 +185,8 @@ func TestZenLockCRD_Exists(t *testing.T) {
 		t.Fatal("Expected at least one GVK for ZenLock")
 	}
 	gvk := kinds[0]
-	if gvk.Group != "security.zen.io" {
-		t.Errorf("Expected group 'security.zen.io', got '%s'", gvk.Group)
+	if gvk.Group != "security.kube-zen.io" {
+		t.Errorf("Expected group 'security.kube-zen.io', got '%s'", gvk.Group)
 	}
 	if gvk.Version != "v1alpha1" {
 		t.Errorf("Expected version 'v1alpha1', got '%s'", gvk.Version)
@@ -197,7 +197,7 @@ func TestZenLockCRD_Exists(t *testing.T) {
 
 	// Also verify we can create a GVK directly
 	expectedGVK := schema.GroupVersionKind{
-		Group:   "security.zen.io",
+		Group:   "security.kube-zen.io",
 		Version: "v1alpha1",
 		Kind:    "ZenLock",
 	}
@@ -507,14 +507,14 @@ func TestPodInjection_E2E(t *testing.T) {
 	if secret.Labels == nil {
 		t.Error("Expected Secret to have labels")
 	} else {
-		if secret.Labels["zen-lock.security.zen.io/pod-name"] != "e2e-test-pod" {
-			t.Errorf("Expected pod-name label 'e2e-test-pod', got '%s'", secret.Labels["zen-lock.security.zen.io/pod-name"])
+		if secret.Labels["zen-lock.security.kube-zen.io/pod-name"] != "e2e-test-pod" {
+			t.Errorf("Expected pod-name label 'e2e-test-pod', got '%s'", secret.Labels["zen-lock.security.kube-zen.io/pod-name"])
 		}
-		if secret.Labels["zen-lock.security.zen.io/pod-namespace"] != namespace {
-			t.Errorf("Expected pod-namespace label '%s', got '%s'", namespace, secret.Labels["zen-lock.security.zen.io/pod-namespace"])
+		if secret.Labels["zen-lock.security.kube-zen.io/pod-namespace"] != namespace {
+			t.Errorf("Expected pod-namespace label '%s', got '%s'", namespace, secret.Labels["zen-lock.security.kube-zen.io/pod-namespace"])
 		}
-		if secret.Labels["zen-lock.security.zen.io/zenlock-name"] != "e2e-injection-test" {
-			t.Errorf("Expected zenlock-name label 'e2e-injection-test', got '%s'", secret.Labels["zen-lock.security.zen.io/zenlock-name"])
+		if secret.Labels["zen-lock.security.kube-zen.io/zenlock-name"] != "e2e-injection-test" {
+			t.Errorf("Expected zenlock-name label 'e2e-injection-test', got '%s'", secret.Labels["zen-lock.security.kube-zen.io/zenlock-name"])
 		}
 	}
 

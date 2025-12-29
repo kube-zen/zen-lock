@@ -30,6 +30,12 @@ This document outlines the planned features and improvements for zen-lock.
 - Safer than files for some applications
 - Configurable injection method
 
+### Troubleshooting Guide Enhancement
+- Add more common issues and solutions:
+  - Webhook timeout issues
+  - Certificate problems
+  - Namespace selector issues
+
 ### Enhanced Validation
 - Validation webhook for ZenLock CRDs
 - Ensure public key matches cluster key

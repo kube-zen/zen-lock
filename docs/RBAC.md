@@ -16,7 +16,6 @@ zen-lock uses separate roles for the controller and webhook to follow the princi
 
 - **zen-lock-controller**: Minimal permissions for controller operations
 - **zen-lock-webhook**: Minimal permissions for webhook operations
-- **zen-lock-manager**: Deprecated combined role (kept for backward compatibility)
 
 ## Controller Role
 
@@ -25,7 +24,7 @@ The `zen-lock-controller` ClusterRole includes the following permissions:
 ### Controller: ZenLock CRD Permissions
 
 ```yaml
-- apiGroups: ["security.zen.io"]
+- apiGroups: ["security.kube-zen.io"]
   resources: ["zenlocks"]
   verbs: ["get", "list", "watch"]
 ```
@@ -35,7 +34,7 @@ The `zen-lock-controller` ClusterRole includes the following permissions:
 - Reconcile ZenLock state
 
 ```yaml
-- apiGroups: ["security.zen.io"]
+- apiGroups: ["security.kube-zen.io"]
   resources: ["zenlocks/status"]
   verbs: ["get", "update", "patch"]
 ```
@@ -77,7 +76,7 @@ The `zen-lock-webhook` ClusterRole includes the following permissions:
 ### Webhook: ZenLock CRD Permissions
 
 ```yaml
-- apiGroups: ["security.zen.io"]
+- apiGroups: ["security.kube-zen.io"]
   resources: ["zenlocks"]
   verbs: ["get"]
 ```
@@ -176,7 +175,25 @@ subjects:
 
 ## ServiceAccounts
 
-zen-lock uses a single ServiceAccount for both controller and webhook (they run in the same process):
+zen-lock uses separate ServiceAccounts for the controller and webhook to achieve least privilege:
+
+### Controller ServiceAccount
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zen-lock-controller
+  namespace: zen-lock-system
+```
+
+The controller ServiceAccount is bound to the `zen-lock-controller` ClusterRole, which grants:
+- Read access to ZenLocks
+- Update access to ZenLock status
+- Read/Update/Delete access to Secrets (for OwnerReference management)
+- Read access to Pods
+- Create access to Events
+- Full access to Leases (for leader election)
 
 ### Webhook ServiceAccount
 
@@ -188,25 +205,12 @@ metadata:
   namespace: zen-lock-system
 ```
 
-**Architecture Decision**: Both the controller (`ZenLockReconciler`, `SecretReconciler`) and webhook (`PodHandler`) run in the same binary (`zen-lock-webhook`), so they share a single ServiceAccount (`zen-lock-webhook`). Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount. This single-SA model is consistent across:
-- Helm chart: Creates one ServiceAccount, binds both roles to it
-- Config manifests (`config/rbac/`): Declares one ServiceAccount, binds both roles to it
-- Deployment: Uses `zen-lock-webhook` ServiceAccount for the single binary
+The webhook ServiceAccount is bound to the `zen-lock-webhook` ClusterRole, which grants:
+- Read access to ZenLocks (get only)
+- Create/Get/Update access to Secrets (for ephemeral secrets)
 
-## Deprecated: Combined Role
+**Architecture Decision**: The controller and webhook run in separate deployments from the same binary image, each using its own ServiceAccount. This ensures true least privilege - the webhook cannot perform controller operations (like deleting secrets or updating ZenLock status), and the controller cannot perform webhook operations (like creating secrets during Pod admission). The binary supports `--enable-controller` and `--enable-webhook` flags to run in controller-only or webhook-only mode.
 
-The `zen-lock-manager` ClusterRole is deprecated but kept for backward compatibility:
-
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: zen-lock-manager
-  annotations:
-    rbac.authorization.k8s.io/justification: "DEPRECATED: Use zen-lock-controller and zen-lock-webhook roles instead."
-```
-
-**Migration**: Update deployments to use separate roles (`controller-role.yaml` and `webhook-role.yaml`).
 
 ## User Permissions
 
@@ -220,7 +224,7 @@ kind: ClusterRole
 metadata:
   name: zen-lock-user
 rules:
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ```
@@ -235,7 +239,7 @@ kind: ClusterRole
 metadata:
   name: zen-lock-reader
 rules:
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch"]
 ```
@@ -318,7 +322,7 @@ kind: ClusterRole
 metadata:
   name: my-zen-lock-role
 rules:
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]

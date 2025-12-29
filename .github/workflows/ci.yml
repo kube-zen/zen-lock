@@ -103,7 +103,7 @@ jobs:
       
       - name: Run unit tests
         run: |
-          # Exclude generated code (pkg/apis/security.zen.io/v1alpha1) from test coverage
+          # Exclude generated code (pkg/apis/security.kube-zen.io/v1alpha1) from test coverage
           # This package contains generated CRD code that doesn't need test coverage
           go test -v -race -coverprofile=coverage.out -covermode=atomic -timeout=10m \
             ./pkg/controller/... \
@@ -119,10 +119,10 @@ jobs:
       - name: Check coverage threshold
         run: |
           echo "Checking test coverage threshold (minimum: 75%)..."
-          # Exclude generated code (pkg/apis/security.zen.io/v1alpha1) from coverage calculation
+          # Exclude generated code (pkg/apis/security.kube-zen.io/v1alpha1) from coverage calculation
           # This package contains generated CRD code that doesn't need test coverage
           # Calculate coverage only for non-generated packages
-          COVERAGE=$(go tool cover -func=coverage.out | grep -v "pkg/apis/security.zen.io/v1alpha1" | grep "total:" | awk '{print $3}' | sed 's/%//')
+          COVERAGE=$(go tool cover -func=coverage.out | grep -v "pkg/apis/security.kube-zen.io/v1alpha1" | grep "total:" | awk '{print $3}' | sed 's/%//')
           echo "Current coverage (excluding generated code): ${COVERAGE}%"
           # Use awk for floating point comparison (more portable than bc)
           THRESHOLD=75

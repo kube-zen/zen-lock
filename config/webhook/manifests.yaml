@@ -31,8 +31,16 @@ spec:
         app: zen-lock-webhook
     spec:
       serviceAccountName: zen-lock-webhook
+      # Note: This deployment runs only the webhook component
+      # The controller runs in a separate deployment with zen-lock-controller ServiceAccount
       containers:
       - name: webhook
+        args:
+        - --cert-dir=/tmp/k8s-webhook-server/serving-certs
+        - --metrics-bind-address=:8080
+        - --health-probe-bind-address=:8081
+        - --enable-controller=false
+        - --enable-webhook=true
         image: kube-zen/zen-lock-webhook:latest
         imagePullPolicy: IfNotPresent
         args:
@@ -82,7 +90,7 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: zen-lock-system/zen-lock-webhook-cert
 webhooks:
-  - name: mutate-pods.zen-lock.security.zen.io
+  - name: mutate-pods.zen-lock.security.kube-zen.io
     clientConfig:
       service:
         name: zen-lock-webhook
@@ -94,8 +102,9 @@ webhooks:
         operations: ["CREATE"]
         resources: ["pods"]
     admissionReviewVersions: ["v1", "v1beta1"]
-    sideEffects: None
+    sideEffects: NoneOnDryRun
     failurePolicy: Fail
+    timeoutSeconds: 10
     namespaceSelector:
       matchLabels:
         zen-lock: enabled

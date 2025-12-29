@@ -1,6 +1,6 @@
 # Helm Repository Setup
 
-This repository hosts a Helm chart repository via GitHub Pages, served from the `main` branch.
+This repository hosts a Helm chart repository via GitHub Pages, served from the `main` branch `/docs` directory.
 
 ## Repository URL
 

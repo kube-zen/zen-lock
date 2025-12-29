@@ -28,14 +28,17 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: ""
+
+# Controller configuration
+controller:
+  # Enable the controller component
+  enabled: true
+  # Number of controller replicas (defaults to replicaCount if not set)
+  replicaCount: 1
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
 
 podAnnotations: {}
 
@@ -96,6 +99,12 @@ webhook:
     issuer:
       name: ""
       kind: ClusterIssuer  # ClusterIssuer or Issuer
+  # Webhook timeout in seconds (default: 10)
+  timeoutSeconds: 10
+  # Webhook failure policy: Fail or Ignore (default: Fail)
+  # Fail: Reject the request if webhook fails
+  # Ignore: Allow the request to proceed if webhook fails
+  failurePolicy: Fail
 
 # Private key configuration
 # IMPORTANT: The private key must be provided via a Kubernetes Secret

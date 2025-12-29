@@ -3,10 +3,10 @@ kind: ClusterRole
 metadata:
   name: zen-lock-webhook
   annotations:
-    rbac.authorization.k8s.io/justification: "Webhook reads ZenLocks and creates ephemeral Secrets for Pod injection. Note: Both controller and webhook run in the same binary, so they share the zen-lock-webhook ServiceAccount."
+    rbac.authorization.k8s.io/justification: "Webhook reads ZenLocks and creates ephemeral Secrets for Pod injection. Also refreshes stale secrets."
 rules:
   # ZenLock CRD: Read only (to fetch and decrypt)
-  - apiGroups: ["security.zen.io"]
+  - apiGroups: ["security.kube-zen.io"]
     resources: ["zenlocks"]
     verbs: ["get"]
   # Secrets: Create, get, update (for ephemeral secrets and stale-secret refresh)

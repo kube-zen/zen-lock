@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error handling using k8serrors.IsAlreadyExists
 - Proper error context throughout codebase
 
-## [0.1.0-alpha] - 2025-01-XX
+## [0.1.0-alpha] - 2015-12-28
 
 ### Added
 - Initial release

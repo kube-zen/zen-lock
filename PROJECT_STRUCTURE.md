@@ -26,7 +26,7 @@ zen-lock/
 │       └── main.go              # Controller entrypoint
 ├── pkg/
 │   ├── apis/                     # CRD type definitions
-│   │   └── security.zen.io/
+│   │   └── security.kube-zen.io/
 │   │       └── v1alpha1/
 │   │           ├── groupversion_info.go
 │   │           ├── zenlock_types.go
@@ -50,7 +50,7 @@ zen-lock/
 ├── config/
 │   ├── crd/                      # CRD definitions
 │   │   └── bases/
-│   │       └── security.zen.io_zenlocks.yaml
+│   │       └── security.kube-zen.io_zenlocks.yaml
 │   ├── rbac/                     # RBAC manifests
 │   │   └── role.yaml
 │   └── webhook/                  # Webhook configuration
@@ -94,9 +94,9 @@ zen-lock/
 - Well-organized packages
 - Business logic
 - Can be imported by other projects
-- Includes CRD types in `pkg/apis/security.zen.io/v1alpha1/`
+- Includes CRD types in `pkg/apis/security.kube-zen.io/v1alpha1/`
 
-### `/pkg/apis/security.zen.io/v1alpha1`
+### `/pkg/apis/security.kube-zen.io/v1alpha1`
 **Purpose**: CRD type definitions
 
 - ZenLock CRD types
@@ -178,5 +178,5 @@ zen-lock/
 
 Current version: **0.1.0-alpha**
 
-Even though this is production-grade architecture, we maintain the alpha version to indicate this is early-stage software that may have breaking changes.
+**Production Readiness**: zen-lock is production-ready for operational concerns (HA, leader election, observability, reliability). Some security features are planned for future versions (KMS integration, automated key rotation, multi-tenancy). See [ROADMAP.md](../ROADMAP.md) for details.
 

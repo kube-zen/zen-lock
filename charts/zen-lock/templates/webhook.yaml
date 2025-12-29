@@ -40,7 +40,7 @@ metadata:
   labels:
     {{- include "zen-lock.labels" . | nindent 4 }}
 webhooks:
-  - name: mutate-pods.zen-lock.security.zen.io
+  - name: mutate-pods.zen-lock.security.kube-zen.io
     clientConfig:
       service:
         name: {{ include "zen-lock.fullname" . }}-webhook
@@ -56,8 +56,9 @@ webhooks:
         operations: ["CREATE"]
         resources: ["pods"]
     admissionReviewVersions: ["v1", "v1beta1"]
-    sideEffects: None
-    failurePolicy: Fail
+    sideEffects: NoneOnDryRun
+    failurePolicy: {{ .Values.webhook.failurePolicy | default "Fail" }}
+    timeoutSeconds: {{ .Values.webhook.timeoutSeconds | default 10 }}
     namespaceSelector:
       matchLabels:
         zen-lock: enabled

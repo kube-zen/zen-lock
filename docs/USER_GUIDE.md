@@ -53,6 +53,23 @@ helm repo update
 helm install zen-lock zen-lock/zen-lock --namespace zen-lock-system --create-namespace
 ```
 
+## Configuration
+
+### Environment Variables
+
+zen-lock supports the following environment variables:
+
+- **`ZEN_LOCK_PRIVATE_KEY`** (Required): The private key used to decrypt secrets. Must be set for the controller to function.
+- **`ZEN_LOCK_CACHE_TTL`** (Optional): Cache TTL for ZenLock CRDs. Default: `5m` (5 minutes). Format: Go duration string (e.g., `10m`, `1h`).
+- **`ZEN_LOCK_ORPHAN_TTL`** (Optional): Time after which orphaned Secrets (Pods not found) are deleted. Default: `15m` (15 minutes). Format: Go duration string.
+
+Example:
+```bash
+export ZEN_LOCK_PRIVATE_KEY=$(cat private-key.age)
+export ZEN_LOCK_CACHE_TTL=10m
+export ZEN_LOCK_ORPHAN_TTL=30m
+```
+
 ## Getting Started
 
 ### 1. Generate Encryption Keys
@@ -127,7 +144,7 @@ This creates a `ZenLock` CRD with encrypted data that can be safely committed to
 ### Example Encrypted Output
 
 ```yaml
-apiVersion: security.zen.io/v1alpha1
+apiVersion: security.kube-zen.io/v1alpha1
 kind: ZenLock
 metadata:
   name: db-credentials
@@ -224,7 +241,7 @@ env:
 Restrict which ServiceAccounts can use a secret:
 
 ```yaml
-apiVersion: security.zen.io/v1alpha1
+apiVersion: security.kube-zen.io/v1alpha1
 kind: ZenLock
 metadata:
   name: db-credentials

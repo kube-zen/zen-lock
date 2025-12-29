@@ -70,7 +70,7 @@ file with encrypted data that can be safely committed to Git.`,
 
 			// Construct ZenLock CRD
 			zenlock := map[string]interface{}{
-				"apiVersion": "security.zen.io/v1alpha1",
+				"apiVersion": "security.kube-zen.io/v1alpha1",
 				"kind":       "ZenLock",
 				"metadata": map[string]interface{}{
 					"name": obj["metadata"].(map[string]interface{})["name"],

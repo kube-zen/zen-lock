@@ -37,10 +37,11 @@ The controller runs as a Kubernetes Deployment and includes:
 - Inject secrets into Pods
 
 **ServiceAccount Model:**
-- Both controller and webhook run in the same binary (`zen-lock-webhook`)
-- They share a single ServiceAccount (`zen-lock-webhook`)
-- Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount
-- This single-SA model is consistent across Helm chart and config manifests
+- Controller and webhook run in separate deployments from the same binary image
+- Controller uses `zen-lock-controller` ServiceAccount with `zen-lock-controller` ClusterRole
+- Webhook uses `zen-lock-webhook` ServiceAccount with `zen-lock-webhook` ClusterRole
+- This separation ensures least privilege - each component only has the permissions it needs
+- The binary supports `--enable-controller` and `--enable-webhook` flags to run in component-specific mode
 
 **Performance Optimizations:**
 - **ZenLock Caching**: Webhook caches ZenLock CRDs (5min TTL, configurable) to reduce API server load

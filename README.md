@@ -11,7 +11,7 @@ zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge se
 - **Age Encryption**: Uses modern, easy-to-use encryption (age) by default.
 - **AllowedSubjects**: Restrict secret access to specific ServiceAccounts.
 - **Comprehensive Testing**: Full integration and E2E test coverage.
-- **Production-Ready**: Orphan cleanup, stale-secret prevention, least-privilege RBAC.
+- **Production-Ready Operations**: High availability, leader election, comprehensive observability (metrics, alerts, dashboards), least-privilege RBAC, orphan cleanup, stale-secret prevention.
 
 ## Quick Start
 
@@ -191,7 +191,7 @@ zen-lock decrypt \
 ### ZenLock CRD
 
 ```yaml
-apiVersion: security.zen.io/v1alpha1
+apiVersion: security.kube-zen.io/v1alpha1
 kind: ZenLock
 metadata:
   name: example-secret
@@ -231,6 +231,24 @@ export ZEN_LOCK_PRIVATE_KEY=$(cat private-key.age)
 # Run webhook locally
 make run
 ```
+
+## Production Readiness
+
+zen-lock is **production-ready** for operational concerns:
+
+- ✅ **High Availability**: Leader election, separate controller/webhook deployments, graceful shutdown
+- ✅ **Observability**: Comprehensive Prometheus metrics, Grafana dashboards, alerting rules
+- ✅ **Reliability**: Orphan cleanup, stale-secret prevention, error handling, input validation
+- ✅ **Security**: Least-privilege RBAC, separate ServiceAccounts, zero-knowledge encryption
+- ✅ **Testing**: Full integration and E2E test coverage
+
+**Security Features Status**:
+
+- ✅ **Current (v0.1.0-alpha)**: Zero-knowledge encryption, AllowedSubjects, ephemeral secrets, automatic cleanup
+- 🔄 **Planned (v0.2.0)**: KMS integration (AWS KMS, GCP KMS, Azure Key Vault), multi-tenancy (per-namespace keys), environment variable injection
+- 🔄 **Planned (v1.0.0)**: Automated key rotation, secret versioning, audit logging integration
+
+See [ROADMAP.md](ROADMAP.md) for detailed feature plans.
 
 ## Security Model
 

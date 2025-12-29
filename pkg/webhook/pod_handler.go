@@ -19,7 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/common"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
@@ -32,11 +33,6 @@ const (
 	// Default values
 	defaultMountPath  = "/zen-lock/secrets"
 	defaultVolumeName = "zen-secrets"
-
-	// Label keys for Secret tracking
-	labelPodName      = "zen-lock.security.zen.io/pod-name"
-	labelPodNamespace = "zen-lock.security.zen.io/pod-namespace"
-	labelZenLockName  = "zen-lock.security.zen.io/zenlock-name"
 )
 
 // GenerateSecretName generates a stable secret name from namespace and pod name
@@ -210,6 +206,29 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	// Generate stable secret name from namespace and pod name (available at admission time)
 	secretName := GenerateSecretName(req.Namespace, pod.Name)
 
+	// Skip Secret creation/updates in dry-run mode (no side effects)
+	if req.DryRun != nil && *req.DryRun {
+		// In dry-run mode, we still mutate the Pod but skip Secret operations
+		// This allows accurate mutation simulation without side effects
+		mutatedPod := pod.DeepCopy()
+		if err := h.mutatePod(mutatedPod, secretName, mountPath); err != nil {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+			sanitizedErr := SanitizeError(err, "mutate pod (dry-run)")
+			return admission.Errored(http.StatusInternalServerError, sanitizedErr)
+		}
+		mutatedPodBytes, err := json.Marshal(mutatedPod)
+		if err != nil {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+			sanitizedErr := SanitizeError(err, "marshal mutated pod (dry-run)")
+			return admission.Errored(http.StatusInternalServerError, sanitizedErr)
+		}
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "success", duration)
+		return admission.PatchResponseFromRaw(req.Object.Raw, mutatedPodBytes)
+	}
+
 	// Create ephemeral Secret with labels (OwnerReference will be set by controller later)
 	// Pod UID is not available at admission time, so we use labels for tracking
 	secret := &corev1.Secret{
@@ -217,9 +236,9 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 			Name:      secretName,
 			Namespace: req.Namespace,
 			Labels: map[string]string{
-				labelPodName:      pod.Name,
-				labelPodNamespace: req.Namespace,
-				labelZenLockName:  injectName,
+				common.LabelPodName:      pod.Name,
+				common.LabelPodNamespace: req.Namespace,
+				common.LabelZenLockName:  injectName,
 			},
 		},
 		Data: secretData,
@@ -238,24 +257,27 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 				return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 			}
 
-			// Ensure labels map is initialized (defense against nil labels from legacy/collision Secrets)
+			// Ensure labels map is initialized (defense against nil labels from collision Secrets)
 			if existingSecret.Labels == nil {
 				existingSecret.Labels = make(map[string]string)
 			}
 
 			// Check if existing secret matches current ZenLock (by comparing ZenLock name label)
-			existingZenLockName, hasZenLockLabel := existingSecret.Labels[labelZenLockName]
+			existingZenLockName, hasZenLockLabel := existingSecret.Labels[common.LabelZenLockName]
 			if !hasZenLockLabel || existingZenLockName != injectName {
 				// Secret exists but is for a different ZenLock - this is stale, update it
-				existingSecret.Data = secretData
-				existingSecret.Labels[labelZenLockName] = injectName
-				existingSecret.Labels[labelPodName] = pod.Name
-				existingSecret.Labels[labelPodNamespace] = req.Namespace
-				if err := h.Client.Update(ctx, existingSecret); err != nil {
-					duration := time.Since(startTime).Seconds()
-					metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-					sanitizedErr := SanitizeError(err, "update stale secret")
-					return admission.Errored(http.StatusInternalServerError, sanitizedErr)
+				// Skip update in dry-run mode
+				if req.DryRun == nil || !*req.DryRun {
+					existingSecret.Data = secretData
+					existingSecret.Labels[common.LabelZenLockName] = injectName
+					existingSecret.Labels[common.LabelPodName] = pod.Name
+					existingSecret.Labels[common.LabelPodNamespace] = req.Namespace
+					if err := h.Client.Update(ctx, existingSecret); err != nil {
+						duration := time.Since(startTime).Seconds()
+						metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+						sanitizedErr := SanitizeError(err, "update stale secret")
+						return admission.Errored(http.StatusInternalServerError, sanitizedErr)
+					}
 				}
 			} else {
 				// Secret exists and matches current ZenLock - verify data matches (defense in depth)
