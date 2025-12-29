@@ -19,6 +19,7 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -242,5 +243,195 @@ func TestCreatePatch(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPodHandler_Handle_ZenLockNotFound(t *testing.T) {
+	handler, _ := setupTestPodHandler(t)
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"zen-lock/inject": "non-existent-secret",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "test-container", Image: "nginx"},
+			},
+		},
+	}
+
+	podRaw, _ := json.Marshal(pod)
+	req := admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Object:    runtime.RawExtension{Raw: podRaw},
+			Namespace: "default",
+		},
+	}
+
+	ctx := context.Background()
+	resp := handler.Handle(ctx, req)
+
+	if resp.Allowed {
+		t.Error("Expected request to be denied when ZenLock not found")
+	}
+}
+
+func TestPodHandler_Handle_AllowedSubjectsDenied(t *testing.T) {
+	handler, clientBuilder := setupTestPodHandler(t)
+
+	// Create ServiceAccount
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "allowed-sa",
+			Namespace: "default",
+		},
+	}
+
+	// Create ZenLock with AllowedSubjects
+	zenlock := &securityv1alpha1.ZenLock{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "default",
+		},
+		Spec: securityv1alpha1.ZenLockSpec{
+			EncryptedData: map[string]string{
+				"key1": "encrypted-value",
+			},
+			Algorithm: "age",
+			AllowedSubjects: []securityv1alpha1.SubjectReference{
+				{
+					Kind:      "ServiceAccount",
+					Name:      "allowed-sa",
+					Namespace: "default",
+				},
+			},
+		},
+	}
+
+	handler.Client = clientBuilder.WithObjects(sa, zenlock).Build()
+
+	// Create Pod with disallowed ServiceAccount
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"zen-lock/inject": "test-secret",
+			},
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "disallowed-sa",
+			Containers: []corev1.Container{
+				{Name: "test-container", Image: "nginx"},
+			},
+		},
+	}
+
+	podRaw, _ := json.Marshal(pod)
+	req := admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Object:    runtime.RawExtension{Raw: podRaw},
+			Namespace: "default",
+		},
+	}
+
+	ctx := context.Background()
+	resp := handler.Handle(ctx, req)
+
+	if resp.Allowed {
+		t.Error("Expected request to be denied when ServiceAccount not in AllowedSubjects")
+	}
+}
+
+func TestPodHandler_Handle_CustomMountPath(t *testing.T) {
+	handler, _ := setupTestPodHandler(t)
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "test-container", Image: "nginx"},
+			},
+		},
+	}
+
+	patch, err := handler.createPatch(pod, "test-secret", "/custom/path")
+	if err != nil {
+		t.Fatalf("createPatch() error = %v", err)
+	}
+
+	// Verify patch contains custom mount path
+	var patches []map[string]interface{}
+	if err := json.Unmarshal(patch, &patches); err != nil {
+		t.Fatalf("Failed to unmarshal patch: %v", err)
+	}
+
+	foundMountPath := false
+	for _, p := range patches {
+		if path, ok := p["path"].(string); ok && path == "/spec/containers/0/volumeMounts" {
+			if value, ok := p["value"].([]interface{}); ok {
+				for _, vm := range value {
+					if vmMap, ok := vm.(map[string]interface{}); ok {
+						if mp, ok := vmMap["mountPath"].(string); ok && mp == "/custom/path" {
+							foundMountPath = true
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if !foundMountPath {
+		t.Error("Expected patch to contain custom mount path")
+	}
+}
+
+func TestPodHandler_Handle_MultipleContainers(t *testing.T) {
+	handler, _ := setupTestPodHandler(t)
+
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "container1", Image: "nginx"},
+				{Name: "container2", Image: "busybox"},
+				{Name: "container3", Image: "alpine"},
+			},
+		},
+	}
+
+	patch, err := handler.createPatch(pod, "test-secret", "/zen-secrets")
+	if err != nil {
+		t.Fatalf("createPatch() error = %v", err)
+	}
+
+	// Verify patch adds volume mounts to all containers
+	var patches []map[string]interface{}
+	if err := json.Unmarshal(patch, &patches); err != nil {
+		t.Fatalf("Failed to unmarshal patch: %v", err)
+	}
+
+	containerMounts := make(map[int]bool)
+	for _, p := range patches {
+		if path, ok := p["path"].(string); ok {
+			// Check for container volume mount paths
+			for i := 0; i < 3; i++ {
+				expectedPath := fmt.Sprintf("/spec/containers/%d/volumeMounts", i)
+				if path == expectedPath {
+					containerMounts[i] = true
+				}
+			}
+		}
+	}
+
+	if len(containerMounts) != 3 {
+		t.Errorf("Expected volume mounts for all 3 containers, got %d", len(containerMounts))
 	}
 }

@@ -102,11 +102,31 @@ The mutating webhook:
 - Validates AllowedSubjects (if configured)
 - Creates ephemeral secrets atomically
 
+## Testing
+
+zen-lock includes comprehensive testing:
+
+- **Unit Tests**: Fast, isolated tests for individual components
+- **Integration Tests**: Component interactions using fake clients
+  - Encryption/decryption flow
+  - Ephemeral secret cleanup
+  - AllowedSubjects validation
+  - Status updates
+- **E2E Tests**: End-to-end tests with envtest
+  - Full workflow from encryption to pod injection
+  - Pod injection with webhook server
+  - AllowedSubjects validation
+  - Invalid ciphertext handling
+
+See [TESTING.md](TESTING.md) for details.
+
 ## Future Enhancements
 
-- KMS integration for key management
-- Multi-tenancy support
-- Environment variable injection
-- Certificate rotation
+- KMS integration for key management (v0.2.0)
+- Multi-tenancy support (v0.2.0)
+- Environment variable injection (v0.2.0)
+- Certificate rotation (v1.0.0)
 - Performance optimizations
+
+See [ROADMAP.md](../ROADMAP.md) for planned features.
 

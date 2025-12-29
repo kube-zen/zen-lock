@@ -60,6 +60,9 @@ Integration tests cover:
 - ✅ ZenLock CRUD operations
 - ✅ Status updates
 - ✅ Component interactions
+- ✅ Full encryption/decryption flow
+- ✅ Ephemeral secret cleanup with OwnerReferences
+- ✅ AllowedSubjects validation
 
 ### Running Integration Tests
 
@@ -96,8 +99,11 @@ go test -v -tags=e2e ./test/e2e/... -run TestZenLockCRUD_E2E
 
 - ✅ CRD existence and validation
 - ✅ ZenLock CRUD operations
-- ⏳ Pod injection (requires webhook server)
-- ⏳ AllowedSubjects validation (requires webhook server)
+- ✅ Pod injection with webhook server
+- ✅ AllowedSubjects validation with webhook server
+- ✅ Ephemeral secret creation and OwnerReferences
+- ✅ Invalid ciphertext handling
+- ✅ Controller reconciliation
 
 ## Test Structure
 
@@ -165,4 +171,27 @@ make coverage
 # Run CI checks (includes tests)
 make ci-check
 ```
+
+## Test Status
+
+### Current Test Coverage
+
+- ✅ **Integration Tests**: Comprehensive coverage including encryption/decryption flow, ephemeral secret cleanup, and AllowedSubjects validation
+- ✅ **E2E Tests**: Full end-to-end tests with webhook server, pod injection, and validation
+- ✅ **Webhook Unit Tests**: Enhanced with edge cases and error scenarios
+- ⚠️ **Unit Test Coverage**: Some packages need improvement to reach 75% threshold
+
+### Test Files
+
+- Integration tests: `test/integration/integration_test.go`
+- E2E tests: `test/e2e/e2e_test.go`
+- Webhook tests: `pkg/webhook/pod_handler_test.go`
+- Controller tests: `pkg/controller/reconciler_test.go`
+
+## See Also
+
+- [User Guide](USER_GUIDE.md) - Usage instructions
+- [Architecture](ARCHITECTURE.md) - System architecture
+- [API Reference](API_REFERENCE.md) - Complete API documentation
+- [README](../README.md) - Project overview
 

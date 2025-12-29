@@ -222,6 +222,10 @@ Prometheus alerting rules are available at `deploy/prometheus/prometheus-rules.y
 ## See Also
 
 - [Architecture](ARCHITECTURE.md) - How metrics are collected
+- [User Guide](USER_GUIDE.md) - Usage instructions
+- [API Reference](API_REFERENCE.md) - Complete API documentation
+- [Testing Guide](TESTING.md) - Testing infrastructure
 - [Prometheus Rules](../deploy/prometheus/prometheus-rules.yaml) - Alerting rules
 - [Grafana Dashboard](../deploy/grafana/dashboard.json) - Dashboard definition
+- [README](../README.md) - Project overview
 

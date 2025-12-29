@@ -9,6 +9,8 @@ zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge se
 - **GitOps Ready**: Encrypted manifests can be safely committed to Git.
 - **Kubernetes-Native**: Uses standard CRDs and Mutating Webhooks. No external databases.
 - **Age Encryption**: Uses modern, easy-to-use encryption (age) by default.
+- **AllowedSubjects**: Restrict secret access to specific ServiceAccounts.
+- **Comprehensive Testing**: Full integration and E2E test coverage.
 
 ## Quick Start
 
@@ -225,6 +227,18 @@ zen-lock implements Zero-Knowledge encryption:
 - **In Memory**: The decrypted value exists only as a standard Kubernetes Secret mounted into the Pod.
 - **Auto-Cleanup**: By setting the OwnerReference of the decrypted secret to the Pod, Kubernetes guarantees that the secret is deleted when the Pod is removed.
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[User Guide](docs/USER_GUIDE.md)** - Complete guide for using zen-lock
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation
+- **[Architecture](docs/ARCHITECTURE.md)** - System architecture and design
+- **[RBAC](docs/RBAC.md)** - RBAC permissions and configuration
+- **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md)** - Security guidelines
+- **[Testing Guide](docs/TESTING.md)** - Testing infrastructure and coverage
+- **[Metrics](docs/METRICS.md)** - Prometheus metrics documentation
+
 ## Troubleshooting
 
 ### Pod is stuck in ContainerCreating
@@ -243,6 +257,15 @@ kubectl get deployment zen-lock-webhook -n zen-lock-system -o yaml | grep ZEN_LO
 
 Secrets are injected at Pod creation time. You must delete and recreate the Pod to get updated secrets.
 
+### Webhook Denial
+
+If Pod creation is denied:
+1. Check AllowedSubjects: Verify the Pod's ServiceAccount is in the allowed list
+2. Check webhook logs: Look for denial reasons
+3. Verify ZenLock exists: Ensure the ZenLock CRD exists in the namespace
+
+For more troubleshooting tips, see the [User Guide](docs/USER_GUIDE.md#troubleshooting).
+
 ## Contributing
 
 We welcome contributions! Please see CONTRIBUTING.md for details.
@@ -255,4 +278,5 @@ Apache License 2.0
 
 - **Issues**: [GitHub Issues](https://github.com/kube-zen/zen-lock/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/kube-zen/zen-lock/discussions)
+- **Documentation**: See [docs/](docs/) directory for comprehensive guides
 

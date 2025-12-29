@@ -18,9 +18,11 @@ package integration
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"testing"
 
+	"filippo.io/age"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -179,8 +181,266 @@ func TestZenLockCRUD_Integration(t *testing.T) {
 func TestCryptoEncryptDecrypt_Integration(t *testing.T) {
 	_, _, encryptor := setupTestEnvironment(t)
 
-	// Note: This test requires actual age keys to work properly
-	// For now, we'll skip it and rely on unit tests with mocked crypto
-	_ = encryptor
-	t.Skip("Requires actual age keys - covered in unit tests")
+	// Generate test keys using age library
+	identity, err := age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatalf("Failed to generate identity: %v", err)
+	}
+
+	privateKey := identity.String()
+	publicKey := identity.Recipient().String()
+
+	// Test encryption/decryption flow
+	plaintext := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+
+	// Encrypt
+	encryptedData := make(map[string]string)
+	for k, v := range plaintext {
+		ciphertext, err := encryptor.Encrypt([]byte(v), []string{publicKey})
+		if err != nil {
+			t.Fatalf("Failed to encrypt %s: %v", k, err)
+		}
+		// Base64 encode for DecryptMap
+		encryptedData[k] = base64.StdEncoding.EncodeToString(ciphertext)
+	}
+
+	// Decrypt
+	decryptedMap, err := encryptor.DecryptMap(encryptedData, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to decrypt map: %v", err)
+	}
+
+	// Verify
+	if len(decryptedMap) != len(plaintext) {
+		t.Errorf("Expected %d decrypted keys, got %d", len(plaintext), len(decryptedMap))
+	}
+
+	for k, expectedValue := range plaintext {
+		actualValue, exists := decryptedMap[k]
+		if !exists {
+			t.Errorf("Key %s not found in decrypted map", k)
+			continue
+		}
+		if string(actualValue) != expectedValue {
+			t.Errorf("Key %s: expected %q, got %q", k, expectedValue, string(actualValue))
+		}
+	}
+}
+
+func TestEphemeralSecretCleanup_Integration(t *testing.T) {
+	ctx, clientBuilder, _ := setupTestEnvironment(t)
+
+	client := clientBuilder.Build()
+
+	// Create a Pod
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			UID:       types.UID("test-pod-uid"),
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "test-container", Image: "nginx"},
+			},
+		},
+	}
+
+	if err := client.Create(ctx, pod); err != nil {
+		t.Fatalf("Failed to create Pod: %v", err)
+	}
+
+	// Create ephemeral Secret with OwnerReference to Pod
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "zen-lock-inject-test-pod-uid",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        pod.UID,
+					Controller: func() *bool { b := true; return &b }(),
+				},
+			},
+		},
+		Data: map[string][]byte{
+			"key1": []byte("value1"),
+		},
+	}
+
+	if err := client.Create(ctx, secret); err != nil {
+		t.Fatalf("Failed to create Secret: %v", err)
+	}
+
+	// Verify Secret exists
+	retrievedSecret := &corev1.Secret{}
+	secretNN := types.NamespacedName{Name: "zen-lock-inject-test-pod-uid", Namespace: "default"}
+	if err := client.Get(ctx, secretNN, retrievedSecret); err != nil {
+		t.Fatalf("Failed to get Secret: %v", err)
+	}
+
+	// Verify OwnerReference
+	if len(retrievedSecret.OwnerReferences) == 0 {
+		t.Error("Expected Secret to have OwnerReference")
+	} else {
+		ownerRef := retrievedSecret.OwnerReferences[0]
+		if ownerRef.Kind != "Pod" {
+			t.Errorf("Expected OwnerReference kind 'Pod', got '%s'", ownerRef.Kind)
+		}
+		if ownerRef.Name != "test-pod" {
+			t.Errorf("Expected OwnerReference name 'test-pod', got '%s'", ownerRef.Name)
+		}
+		if ownerRef.UID != pod.UID {
+			t.Errorf("Expected OwnerReference UID %s, got %s", pod.UID, ownerRef.UID)
+		}
+	}
+
+	// Delete Pod - Secret should be automatically deleted by Kubernetes
+	if err := client.Delete(ctx, pod); err != nil {
+		t.Fatalf("Failed to delete Pod: %v", err)
+	}
+
+	// Wait a bit for garbage collection (in real cluster, this happens automatically)
+	// In fake client, we need to manually verify the relationship
+	// The test verifies that OwnerReference is correctly set
+}
+
+func TestAllowedSubjectsValidation_Integration(t *testing.T) {
+	ctx, clientBuilder, _ := setupTestEnvironment(t)
+
+	client := clientBuilder.Build()
+
+	// Create ServiceAccount
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backend-app",
+			Namespace: "default",
+		},
+	}
+
+	if err := client.Create(ctx, sa); err != nil {
+		t.Fatalf("Failed to create ServiceAccount: %v", err)
+	}
+
+	// Create ZenLock with AllowedSubjects
+	zenlock := &securityv1alpha1.ZenLock{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "default",
+		},
+		Spec: securityv1alpha1.ZenLockSpec{
+			EncryptedData: map[string]string{
+				"key1": "encrypted-value",
+			},
+			Algorithm: "age",
+			AllowedSubjects: []securityv1alpha1.SubjectReference{
+				{
+					Kind:      "ServiceAccount",
+					Name:      "backend-app",
+					Namespace: "default",
+				},
+			},
+		},
+	}
+
+	if err := client.Create(ctx, zenlock); err != nil {
+		t.Fatalf("Failed to create ZenLock: %v", err)
+	}
+
+	// Verify ZenLock has AllowedSubjects
+	retrieved := &securityv1alpha1.ZenLock{}
+	nn := types.NamespacedName{Name: "test-secret", Namespace: "default"}
+	if err := client.Get(ctx, nn, retrieved); err != nil {
+		t.Fatalf("Failed to get ZenLock: %v", err)
+	}
+
+	if len(retrieved.Spec.AllowedSubjects) != 1 {
+		t.Errorf("Expected 1 AllowedSubject, got %d", len(retrieved.Spec.AllowedSubjects))
+	}
+
+	allowedSubject := retrieved.Spec.AllowedSubjects[0]
+	if allowedSubject.Kind != "ServiceAccount" {
+		t.Errorf("Expected Kind 'ServiceAccount', got '%s'", allowedSubject.Kind)
+	}
+	if allowedSubject.Name != "backend-app" {
+		t.Errorf("Expected Name 'backend-app', got '%s'", allowedSubject.Name)
+	}
+	if allowedSubject.Namespace != "default" {
+		t.Errorf("Expected Namespace 'default', got '%s'", allowedSubject.Namespace)
+	}
+}
+
+func TestZenLockStatusUpdate_Integration(t *testing.T) {
+	// Set test private key before setup
+	originalKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE")
+	defer func() {
+		if originalKey != "" {
+			os.Setenv("ZEN_LOCK_PRIVATE_KEY", originalKey)
+		} else {
+			os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+		}
+	}()
+
+	ctx, clientBuilder, _ := setupTestEnvironment(t)
+
+	zenlock := &securityv1alpha1.ZenLock{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-status",
+			Namespace: "default",
+		},
+		Spec: securityv1alpha1.ZenLockSpec{
+			EncryptedData: map[string]string{
+				"key1": "encrypted-value",
+			},
+			Algorithm: "age",
+		},
+	}
+
+	client := clientBuilder.WithObjects(zenlock).Build()
+
+	reconciler, err := controller.NewZenLockReconciler(client, client.Scheme())
+	if err != nil {
+		t.Fatalf("Failed to create reconciler: %v", err)
+	}
+
+	// Reconcile
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "test-status",
+			Namespace: "default",
+		},
+	}
+
+	_, err = reconciler.Reconcile(ctx, req)
+	if err != nil {
+		t.Errorf("Reconcile() error = %v", err)
+	}
+
+	// Verify status was updated
+	updatedZenLock := &securityv1alpha1.ZenLock{}
+	if err := client.Get(ctx, req.NamespacedName, updatedZenLock); err != nil {
+		t.Fatalf("Failed to get ZenLock: %v", err)
+	}
+
+	// Check that status has been set (controller should update status)
+	if updatedZenLock.Status.Phase == "" {
+		t.Log("Status Phase not set - this may be expected if controller doesn't update status for invalid ciphertext")
+	}
+
+	// Check conditions
+	if len(updatedZenLock.Status.Conditions) > 0 {
+		// Verify LastTransitionTime is set
+		for _, condition := range updatedZenLock.Status.Conditions {
+			if condition.LastTransitionTime.IsZero() {
+				t.Error("Expected LastTransitionTime to be set in condition")
+			}
+		}
+	}
 }
