@@ -36,6 +36,12 @@ The controller runs as a Kubernetes Deployment and includes:
 - Handle Pod admission requests
 - Inject secrets into Pods
 
+**ServiceAccount Model:**
+- Both controller and webhook run in the same binary (`zen-lock-webhook`)
+- They share a single ServiceAccount (`zen-lock-webhook`)
+- Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount
+- This single-SA model is consistent across Helm chart and config manifests
+
 ### 3. Webhook Handler (`pkg/webhook`)
 
 The webhook handler intercepts Pod creation requests.

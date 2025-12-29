@@ -188,7 +188,10 @@ metadata:
   namespace: zen-lock-system
 ```
 
-**Note**: Both the controller (`ZenLockReconciler`, `SecretReconciler`) and webhook (`PodHandler`) run in the same binary (`zen-lock-webhook`), so they share the same ServiceAccount. Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount.
+**Architecture Decision**: Both the controller (`ZenLockReconciler`, `SecretReconciler`) and webhook (`PodHandler`) run in the same binary (`zen-lock-webhook`), so they share a single ServiceAccount (`zen-lock-webhook`). Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount. This single-SA model is consistent across:
+- Helm chart: Creates one ServiceAccount, binds both roles to it
+- Config manifests (`config/rbac/`): Declares one ServiceAccount, binds both roles to it
+- Deployment: Uses `zen-lock-webhook` ServiceAccount for the single binary
 
 ## Deprecated: Combined Role
 

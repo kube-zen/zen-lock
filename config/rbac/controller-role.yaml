@@ -3,7 +3,7 @@ kind: ClusterRole
 metadata:
   name: zen-lock-controller
   annotations:
-    rbac.authorization.k8s.io/justification: "Controller reconciles ZenLocks and updates their status. Also sets OwnerReferences on Secrets created by webhook."
+    rbac.authorization.k8s.io/justification: "Controller reconciles ZenLocks and updates their status. Also sets OwnerReferences on Secrets created by webhook. Note: Both controller and webhook run in the same binary, so they share the zen-lock-webhook ServiceAccount."
 rules:
   # ZenLock CRD: Read and update status only
   - apiGroups: ["security.zen.io"]

@@ -139,4 +139,3 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&corev1.Secret{}).
 		Complete(r)
 }
-

@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -223,7 +224,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 					dataMatches = false
 				} else {
 					for k, v := range secretData {
-						if existingVal, ok := existingSecret.Data[k]; !ok || string(existingVal) != string(v) {
+						if existingVal, ok := existingSecret.Data[k]; !ok || !bytes.Equal(existingVal, v) {
 							dataMatches = false
 							break
 						}

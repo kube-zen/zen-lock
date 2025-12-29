@@ -246,7 +246,7 @@ zen-lock implements Zero-Knowledge encryption with the following security proper
 - **In Memory**: The decrypted value exists as a standard Kubernetes Secret mounted into the Pod.
 - **Auto-Cleanup**: By setting the OwnerReference of the decrypted secret to the Pod, Kubernetes guarantees that the secret is deleted when the Pod is removed.
 
-**Important**: While the source-of-truth (ZenLock CRD) is encrypted, ephemeral Secrets created by the webhook are standard Kubernetes Secrets. Enable etcd encryption at rest for additional protection.
+**Important**: The source-of-truth (ZenLock CRD) is encrypted and never stored in plaintext. However, ephemeral Secrets created by the webhook are standard Kubernetes Secrets containing decrypted data. Enable etcd encryption at rest for additional protection of ephemeral Secrets.
 
 ## Documentation
 

@@ -1,10 +1,6 @@
-# ServiceAccounts
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: zen-lock-controller
-  namespace: zen-lock-system
----
+# ServiceAccount
+# Note: Both controller and webhook run in the same binary (zen-lock-webhook),
+# so they share a single ServiceAccount. Both ClusterRoles are bound to this SA.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
