@@ -128,13 +128,13 @@ func TestNewZenLockValidator_Success(t *testing.T) {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
 	if validator == nil {
-		t.Error("Expected validator to be created")
+		t.Fatal("Expected validator to be created")
 	}
 	if validator.crypto == nil {
-		t.Error("Expected crypto to be initialized")
+		t.Fatal("Expected crypto to be initialized")
 	}
 	if validator.privateKey != privateKey {
-		t.Error("Expected private key to be set")
+		t.Fatal("Expected private key to be set")
 	}
 }
 
@@ -142,10 +142,10 @@ func TestNewZenLockValidatorHandler_Success(t *testing.T) {
 	handler, scheme := setupTestValidator(t)
 	_ = scheme // Suppress unused variable warning
 	if handler == nil {
-		t.Error("Expected handler to be created")
+		t.Fatal("Expected handler to be created")
 	}
 	if handler.validator == nil {
-		t.Error("Expected validator to be initialized")
+		t.Fatal("Expected validator to be initialized")
 	}
 }
 
