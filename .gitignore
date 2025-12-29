@@ -12,6 +12,7 @@ bin/
 # Output of the go coverage tool
 *.out
 coverage.html
+coverage.*
 
 # Dependency directories
 vendor/
@@ -38,4 +39,11 @@ private-key*
 
 # Build artifacts
 .helm-packages/
+*.tgz
+
+# Standalone binaries (if built in root)
+/zen-lock
+/zen-lock-webhook
+/webhook
+/controller
 
