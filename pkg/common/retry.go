@@ -192,4 +192,3 @@ func RetryWithResult[T any](ctx context.Context, config RetryConfig, fn func() (
 
 	return zero, fmt.Errorf("max retry attempts (%d) exceeded: %w", config.MaxAttempts, lastErr)
 }
-

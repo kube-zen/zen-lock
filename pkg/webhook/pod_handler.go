@@ -284,7 +284,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 					existingSecret.Labels[common.LabelZenLockName] = injectName
 					existingSecret.Labels[common.LabelPodName] = pod.Name
 					existingSecret.Labels[common.LabelPodNamespace] = req.Namespace
-					
+
 					// Retry update with exponential backoff for conflict/transient errors
 					updateErr := common.Retry(ctx, retryConfig, func() error {
 						return h.Client.Update(ctx, existingSecret)
@@ -313,7 +313,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 				if !dataMatches {
 					// Data doesn't match - update secret with fresh data
 					existingSecret.Data = secretData
-					
+
 					// Retry update with exponential backoff for conflict/transient errors
 					updateErr := common.Retry(ctx, retryConfig, func() error {
 						return h.Client.Update(ctx, existingSecret)
