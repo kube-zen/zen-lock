@@ -35,7 +35,7 @@ spec:
           annotations:
             summary: "zen-lock component is down"
             description: "zen-lock controller or webhook has been down for more than 5 minutes."
-        
+
         # Alert on high reconciliation error rate
         - alert: ZenLockHighReconciliationErrorRate
           expr: rate(zenlock_reconcile_total{result="error"}[5m]) > 5
@@ -47,7 +47,7 @@ spec:
             summary: "High zen-lock reconciliation error rate detected"
             description: >
               zen-lock Controller is experiencing {{ $value }} reconciliation errors per second.
-        
+
         # Alert on webhook injection failures
         - alert: ZenLockWebhookInjectionFailures
           expr: rate(zenlock_webhook_injection_total{result="error"}[5m]) > 2
@@ -60,7 +60,7 @@ spec:
             description: >
               zen-lock webhook is failing to inject secrets at a high rate.
               {{ $value }} failures per second detected.
-        
+
         # Alert on webhook injection denials (AllowedSubjects)
         - alert: ZenLockWebhookInjectionDenials
           expr: rate(zenlock_webhook_injection_total{result="denied"}[5m]) > 1
@@ -73,7 +73,7 @@ spec:
             description: >
               Pods are being denied secret injection due to AllowedSubjects restrictions.
               {{ $value }} denials per second detected.
-        
+
         # Alert on decryption failures
         - alert: ZenLockDecryptionFailures
           expr: rate(zenlock_decryption_total{result="error"}[5m]) > 3
@@ -87,7 +87,7 @@ spec:
               zen-lock is failing to decrypt secrets at a high rate.
               {{ $value }} failures per second detected.
               Check private key configuration and ciphertext validity.
-        
+
         # Alert on slow reconciliation duration
         - alert: ZenLockSlowReconciliation
           expr: >
@@ -101,7 +101,7 @@ spec:
             summary: "Slow reconciliation detected"
             description: >
               95th percentile reconciliation duration is high ({{ $value }}s).
-        
+
         # Alert on slow webhook injection duration
         - alert: ZenLockSlowWebhookInjection
           expr: >
@@ -116,7 +116,7 @@ spec:
             description: >
               95th percentile webhook injection duration is high ({{ $value }}s).
               This may indicate performance issues with secret decryption or API calls.
-        
+
         # Alert on slow decryption duration
         - alert: ZenLockSlowDecryption
           expr: >
@@ -131,7 +131,7 @@ spec:
             description: >
               95th percentile decryption duration is high ({{ $value }}s).
               This may indicate issues with the encryption key or ciphertext size.
-        
+
         # Alert on high webhook validation failures
         - alert: ZenLockWebhookValidationFailures
           expr: rate(zenlock_webhook_validation_failures_total[5m]) > 5
@@ -144,7 +144,7 @@ spec:
             description: >
               zen-lock webhook is experiencing {{ $value }} validation failures per second.
               Check Pod annotations and mount paths for configuration errors.
-        
+
         # Alert on unsupported algorithm usage
         - alert: ZenLockUnsupportedAlgorithm
           expr: rate(zenlock_algorithm_errors_total{reason="unsupported"}[5m]) > 0
@@ -158,7 +158,7 @@ spec:
               zen-lock is encountering unsupported algorithm usage.
               {{ $value }} errors per second detected.
               Check ZenLock CRDs for invalid algorithm specifications.
-        
+
         # Alert on algorithm validation failures
         - alert: ZenLockAlgorithmValidationFailures
           expr: rate(zenlock_algorithm_errors_total{reason="invalid"}[5m]) > 2
