@@ -62,19 +62,27 @@ func (c *ZenLockCache) Get(key types.NamespacedName) (*securityv1alpha1.ZenLock,
 	}
 	
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	entry, exists := c.cache[key]
 	if !exists {
+		c.mu.RUnlock()
 		return nil, false
 	}
 
 	// Check if expired
-	if time.Now().After(entry.expiresAt) {
+	now := time.Now()
+	if now.After(entry.expiresAt) {
+		c.mu.RUnlock()
 		return nil, false
 	}
+	c.mu.RUnlock()
 
-	entry.lastAccess = time.Now()
+	// Update lastAccess with write lock (race condition fix)
+	c.mu.Lock()
+	if entry, stillExists := c.cache[key]; stillExists && !now.After(entry.expiresAt) {
+		entry.lastAccess = now
+	}
+	c.mu.Unlock()
+
 	return entry.zenlock.DeepCopy(), true
 }
 

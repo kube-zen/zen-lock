@@ -86,6 +86,8 @@ func TestZenLockReconciler_Reconcile_ValidZenLock(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-secret",
 			Namespace: "default",
+			// Pre-add finalizer to avoid requeue on first reconcile
+			Finalizers: []string{zenLockFinalizer},
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
 			EncryptedData: map[string]string{
