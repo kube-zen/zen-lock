@@ -51,9 +51,9 @@ build-image:
 		--build-arg VERSION=$$VERSION \
 		--build-arg COMMIT=$$COMMIT \
 		--build-arg BUILD_DATE=$$BUILD_DATE \
-		-t kube-zen/zen-lock-webhook:$$VERSION \
-		-t kube-zen/zen-lock-webhook:latest .
-	@echo "✅ Docker image built: kube-zen/zen-lock-webhook:$$VERSION"
+		-t kube-zen/zen-lock:$$VERSION \
+		-t kube-zen/zen-lock:latest .
+	@echo "✅ Docker image built: kube-zen/zen-lock:$$VERSION"
 
 # Run all tests
 test: test-unit test-integration
