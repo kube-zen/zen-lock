@@ -116,17 +116,16 @@ func TestGenerateSecretName(t *testing.T) {
 
 func TestGenerateSecretName_Uniqueness(t *testing.T) {
 	names := make(map[string]bool)
-	
+
 	// Generate many secret names and verify uniqueness
 	for i := 0; i < 100; i++ {
 		namespace := "ns" + string(rune('a'+i%26))
 		podName := "pod" + string(rune('0'+i%10))
 		secretName := GenerateSecretName(namespace, podName)
-		
+
 		if names[secretName] {
 			t.Errorf("Duplicate secret name generated: %s", secretName)
 		}
 		names[secretName] = true
 	}
 }
-

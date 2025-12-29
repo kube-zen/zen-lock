@@ -29,14 +29,14 @@ func TestNewAgeEncryptor(t *testing.T) {
 
 func TestAgeEncryptor_EncryptDecrypt(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	// Generate a test key pair (this is a simplified test - in real usage, use proper keygen)
 	// For this test, we'll use a known test key pair
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
 	testPublicKey := "age1q3exampleexampleexampleexampleexampleexampleexampleexample"
-	
+
 	plaintext := []byte("test secret data")
-	
+
 	// Encrypt
 	ciphertext, err := encryptor.Encrypt(plaintext, []string{testPublicKey})
 	if err != nil {
@@ -45,18 +45,18 @@ func TestAgeEncryptor_EncryptDecrypt(t *testing.T) {
 		t.Logf("Encrypt returned error (expected for test keys): %v", err)
 		return
 	}
-	
+
 	if len(ciphertext) == 0 {
 		t.Error("Ciphertext should not be empty")
 	}
-	
+
 	// Decrypt
 	decrypted, err := encryptor.Decrypt(ciphertext, testPrivateKey)
 	if err != nil {
 		t.Logf("Decrypt returned error (expected for test keys): %v", err)
 		return
 	}
-	
+
 	if string(decrypted) != string(plaintext) {
 		t.Errorf("Decrypted text doesn't match: got %s, want %s", string(decrypted), string(plaintext))
 	}
@@ -64,9 +64,9 @@ func TestAgeEncryptor_EncryptDecrypt(t *testing.T) {
 
 func TestAgeEncryptor_DecryptMap(t *testing.T) {
 	encryptor := NewAgeEncryptor()
-	
+
 	testPrivateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
-	
+
 	// Test with empty map
 	emptyMap := map[string]string{}
 	result, err := encryptor.DecryptMap(emptyMap, testPrivateKey)
@@ -76,7 +76,7 @@ func TestAgeEncryptor_DecryptMap(t *testing.T) {
 	if result == nil {
 		t.Error("DecryptMap should return a map, even if empty")
 	}
-	
+
 	// Test with invalid ciphertext
 	invalidMap := map[string]string{
 		"key1": "invalid-ciphertext",
@@ -91,4 +91,3 @@ func TestAgeEncryptor_Interface(t *testing.T) {
 	// Verify that AgeEncryptor implements Encryptor interface
 	var _ Encryptor = NewAgeEncryptor()
 }
-

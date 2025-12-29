@@ -27,8 +27,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	corev1 "k8s.io/api/core/v1"
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestNewPodHandler(t *testing.T) {
@@ -131,7 +131,7 @@ func TestNewPodHandler_CacheTTL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create PodHandler: %v", err)
 	}
-	
+
 	// Set a value and check it expires after default TTL
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
@@ -139,17 +139,16 @@ func TestNewPodHandler_CacheTTL(t *testing.T) {
 	}
 	cacheKey := types.NamespacedName{Namespace: "default", Name: "test"}
 	handler1.cache.Set(cacheKey, zenlock)
-	
+
 	// Create cache with short TTL for testing
 	shortTTLCache := NewZenLockCache(50 * time.Millisecond)
 	defer shortTTLCache.Stop()
-	
+
 	shortTTLCache.Set(cacheKey, zenlock)
 	time.Sleep(100 * time.Millisecond)
-	
+
 	_, found := shortTTLCache.Get(cacheKey)
 	if found {
 		t.Error("Expected cache entry to expire")
 	}
 }
-

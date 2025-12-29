@@ -23,7 +23,7 @@ import (
 func TestRecordReconcile(t *testing.T) {
 	RecordReconcile("default", "test-zenlock", "success", 0.1)
 	RecordReconcile("default", "test-zenlock", "error", 0.2)
-	
+
 	// Verify metrics are recorded (check that no panic occurs)
 	// In a real scenario, we'd use a test prometheus registry
 }
@@ -62,4 +62,3 @@ func TestRecordAlgorithmError(t *testing.T) {
 	RecordAlgorithmError("age", "invalid")
 	RecordAlgorithmError("age", "decryption_failed")
 }
-
