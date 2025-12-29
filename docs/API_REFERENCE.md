@@ -21,6 +21,9 @@ spec:
     API_KEY: <base64-encoded-ciphertext>
   
   # Optional: Encryption algorithm (default: "age")
+  # Supported algorithms are registered in the algorithm registry
+  # Currently supported: "age"
+  # Empty value defaults to "age" for backward compatibility
   algorithm: age
   
   # Optional: List of ServiceAccounts allowed to use this secret

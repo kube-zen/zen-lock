@@ -161,6 +161,46 @@ zenlock_webhook_validation_failures_total{namespace="default",reason="invalid_mo
 
 ---
 
+### `zenlock_algorithm_usage_total`
+**Type**: Counter  
+**Description**: Total number of operations using each algorithm  
+**Labels**:
+- `algorithm`: Algorithm name (e.g., `age`, `aes256-gcm`)
+- `operation`: Operation type (`encrypt`, `decrypt`)
+
+**Example**:
+```
+zenlock_algorithm_usage_total{algorithm="age",operation="encrypt"} 1000
+zenlock_algorithm_usage_total{algorithm="age",operation="decrypt"} 1500
+```
+
+**Use Cases**:
+- Track which algorithms are being used in your cluster
+- Monitor algorithm adoption over time
+- Identify ZenLocks using deprecated algorithms
+
+---
+
+### `zenlock_algorithm_errors_total`
+**Type**: Counter  
+**Description**: Total number of algorithm-related errors  
+**Labels**:
+- `algorithm`: Algorithm name (or `unknown` if algorithm cannot be determined)
+- `reason`: Error reason (`unsupported`, `invalid`, `decryption_failed`)
+
+**Example**:
+```
+zenlock_algorithm_errors_total{algorithm="rsa",reason="unsupported"} 5
+zenlock_algorithm_errors_total{algorithm="age",reason="decryption_failed"} 2
+```
+
+**Use Cases**:
+- Alert on unsupported algorithm usage
+- Track algorithm validation failures
+- Monitor decryption failures by algorithm
+
+---
+
 ## Prometheus Queries
 
 ### Reconciliation Success Rate
@@ -231,6 +271,9 @@ A Grafana dashboard is available at `deploy/grafana/dashboard.json` with pre-con
 - Error rates
 - Duration histograms
 - Top ZenLocks by usage
+- Algorithm usage distribution
+- Algorithm usage over time
+- Algorithm errors
 
 See [Grafana Dashboard README](../deploy/grafana/README.md) for installation instructions.
 
@@ -245,6 +288,8 @@ Prometheus alerting rules are available at `deploy/prometheus/prometheus-rules.y
 - **ZenLockWebhookInjectionFailures**: Alerts on webhook injection failures (>2 failures/sec)
 - **ZenLockWebhookInjectionDenials**: Alerts on injection denials (AllowedSubjects violations)
 - **ZenLockDecryptionFailures**: Alerts on decryption failures (>3 failures/sec)
+- **ZenLockUnsupportedAlgorithm**: Alerts on unsupported algorithm usage
+- **ZenLockAlgorithmValidationFailures**: Alerts on algorithm validation failures (>2 failures/sec)
 - **ZenLockSlowReconciliation**: Alerts on slow reconciliations (P95 >5s)
 - **ZenLockSlowWebhookInjection**: Alerts on slow webhook injections (P95 >2s)
 - **ZenLockSlowDecryption**: Alerts on slow decryption operations (P95 >1s)

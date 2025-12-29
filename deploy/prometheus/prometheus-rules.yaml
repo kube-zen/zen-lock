@@ -144,4 +144,31 @@ spec:
             description: >
               zen-lock webhook is experiencing {{ $value }} validation failures per second.
               Check Pod annotations and mount paths for configuration errors.
+        
+        # Alert on unsupported algorithm usage
+        - alert: ZenLockUnsupportedAlgorithm
+          expr: rate(zenlock_algorithm_errors_total{reason="unsupported"}[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: zen-lock
+          annotations:
+            summary: "Unsupported algorithm detected"
+            description: >
+              zen-lock is encountering unsupported algorithm usage.
+              {{ $value }} errors per second detected.
+              Check ZenLock CRDs for invalid algorithm specifications.
+        
+        # Alert on algorithm validation failures
+        - alert: ZenLockAlgorithmValidationFailures
+          expr: rate(zenlock_algorithm_errors_total{reason="invalid"}[5m]) > 2
+          for: 5m
+          labels:
+            severity: warning
+            component: zen-lock
+          annotations:
+            summary: "High algorithm validation failure rate"
+            description: >
+              zen-lock is experiencing {{ $value }} algorithm validation failures per second.
+              Check ZenLock CRDs for algorithm configuration errors.
 

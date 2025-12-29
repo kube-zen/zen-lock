@@ -106,6 +106,24 @@ var (
 		},
 		[]string{"namespace", "reason"},
 	)
+
+	// AlgorithmUsageTotal counts algorithm usage by algorithm name.
+	AlgorithmUsageTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zenlock_algorithm_usage_total",
+			Help: "Total number of operations using each algorithm",
+		},
+		[]string{"algorithm", "operation"}, // operation: encrypt, decrypt
+	)
+
+	// AlgorithmErrorsTotal counts algorithm-related errors.
+	AlgorithmErrorsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zenlock_algorithm_errors_total",
+			Help: "Total number of algorithm-related errors",
+		},
+		[]string{"algorithm", "reason"}, // reason: unsupported, invalid, decryption_failed
+	)
 )
 
 // RecordReconcile records a reconciliation metric.
@@ -139,4 +157,14 @@ func RecordCacheMiss(namespace, zenlockName string) {
 // RecordValidationFailure records a validation failure.
 func RecordValidationFailure(namespace, reason string) {
 	WebhookValidationFailures.WithLabelValues(namespace, reason).Inc()
+}
+
+// RecordAlgorithmUsage records algorithm usage.
+func RecordAlgorithmUsage(algorithm, operation string) {
+	AlgorithmUsageTotal.WithLabelValues(algorithm, operation).Inc()
+}
+
+// RecordAlgorithmError records an algorithm-related error.
+func RecordAlgorithmError(algorithm, reason string) {
+	AlgorithmErrorsTotal.WithLabelValues(algorithm, reason).Inc()
 }

@@ -391,6 +391,85 @@
             "format": "short"
           }
         ]
+      },
+      {
+        "id": 15,
+        "title": "Algorithm Usage Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_algorithm_usage_total[5m])) by (algorithm)",
+            "legendFormat": "{{algorithm}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "pieType": "pie"
+        }
+      },
+      {
+        "id": 16,
+        "title": "Algorithm Usage Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_algorithm_usage_total{operation=\"encrypt\"}[5m])) by (algorithm)",
+            "legendFormat": "{{algorithm}} - Encrypt",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_algorithm_usage_total{operation=\"decrypt\"}[5m])) by (algorithm)",
+            "legendFormat": "{{algorithm}} - Decrypt",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Operations/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Algorithm Errors",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 56},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_algorithm_errors_total{reason=\"unsupported\"}[5m])) by (algorithm)",
+            "legendFormat": "{{algorithm}} - Unsupported",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_algorithm_errors_total{reason=\"invalid\"}[5m])) by (algorithm)",
+            "legendFormat": "{{algorithm}} - Invalid",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(zenlock_algorithm_errors_total{reason=\"decryption_failed\"}[5m])) by (algorithm)",
+            "legendFormat": "{{algorithm}} - Decryption Failed",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Errors/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
       }
     ]
   }

@@ -115,6 +115,49 @@ env:
 
 ## Encrypting Secrets
 
+### Algorithm Selection
+
+zen-lock supports multiple encryption algorithms through an algorithm registry. Each ZenLock CRD can specify its own algorithm, allowing for cryptographic agility and migration to stronger algorithms over time.
+
+**Supported Algorithms**:
+- `age` (default): Modern, easy-to-use encryption. Currently the only implemented algorithm.
+
+**Algorithm Registry**:
+- Algorithms are registered in the codebase using a factory pattern
+- Adding a new algorithm only requires registering it in the registry
+- The system automatically supports registered algorithms in webhook, controller, CLI, and validator
+- Empty algorithm field defaults to "age" for backward compatibility
+
+**Specifying Algorithm**:
+
+```yaml
+apiVersion: security.kube-zen.io/v1alpha1
+kind: ZenLock
+metadata:
+  name: example-secret
+spec:
+  algorithm: age  # Optional: defaults to "age" if not specified
+  encryptedData:
+    KEY: <ciphertext>
+```
+
+**CLI Usage**:
+
+```bash
+# Encrypt with default algorithm (age)
+zen-lock encrypt --pubkey public-key.age --input secrets.yaml --output encrypted.yaml
+
+# Explicitly specify algorithm
+zen-lock encrypt --pubkey public-key.age --algorithm age --input secrets.yaml --output encrypted.yaml
+```
+
+**Algorithm Validation**:
+- The validator checks algorithm support before processing
+- Unsupported algorithms result in clear error messages listing supported algorithms
+- Algorithm errors are tracked in metrics (`zenlock_algorithm_errors_total`)
+
+## Encrypting Secrets (Detailed)
+
 ### Create a Secret File
 
 Create a YAML file with your secret data:
@@ -154,6 +197,10 @@ spec:
     DB_USER: YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB...
     DB_PASS: YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB...
     API_KEY: YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB...
+  # Optional: Encryption algorithm (default: "age")
+  # Supported algorithms are registered in the algorithm registry
+  # Currently supported: "age"
+  # Empty value defaults to "age" for backward compatibility
   algorithm: age
 ```
 
