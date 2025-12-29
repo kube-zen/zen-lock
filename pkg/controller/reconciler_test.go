@@ -44,7 +44,9 @@ func setupTestReconciler(t *testing.T) (*ZenLockReconciler, *fake.ClientBuilder)
 	os.Setenv("ZEN_LOCK_PRIVATE_KEY", "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE")
 
 	scheme := runtime.NewScheme()
-	securityv1alpha1.AddToScheme(scheme)
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add securityv1alpha1 to scheme: %v", err)
+	}
 
 	clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
 

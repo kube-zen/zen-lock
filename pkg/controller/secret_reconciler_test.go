@@ -33,7 +33,9 @@ import (
 
 func setupSecretReconciler(t *testing.T) (*SecretReconciler, *fake.ClientBuilder) {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
 
 	clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
 	reconciler := NewSecretReconciler(clientBuilder.Build(), scheme)
