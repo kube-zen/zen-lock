@@ -124,6 +124,22 @@ var (
 		},
 		[]string{"algorithm", "reason"}, // reason: unsupported, invalid, decryption_failed
 	)
+
+	// CacheSizeGauge tracks the current cache size
+	CacheSizeGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "zenlock_cache_size",
+			Help: "Current number of entries in the ZenLock cache",
+		},
+	)
+
+	// CacheHitRateGauge tracks the cache hit rate (hits / (hits + misses))
+	CacheHitRateGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "zenlock_cache_hit_rate",
+			Help: "Cache hit rate (hits / (hits + misses))",
+		},
+	)
 )
 
 // RecordReconcile records a reconciliation metric.
