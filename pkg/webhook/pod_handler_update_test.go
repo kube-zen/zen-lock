@@ -94,9 +94,8 @@ func TestPodHandler_Handle_SecretUpdateWhenDataDiffers(t *testing.T) {
 	resp := handler.Handle(ctx, req)
 
 	// Should update secret when data differs (may fail on decryption but update path is tested)
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but update path was executed
-	}
+	// Error is expected due to invalid ciphertext, but update path was executed
+	_ = resp.Result
 }
 
 func TestPodHandler_Handle_SecretGetError(t *testing.T) {

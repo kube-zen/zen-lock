@@ -163,9 +163,8 @@ func TestPodHandler_Handle_SecretAlreadyExists_Matching(t *testing.T) {
 
 	// Should skip update when data matches (may fail on decryption but skip path is tested)
 	// We're mainly testing that the AlreadyExists path with matching data is executed
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but matching secret skip path was executed
-	}
+	// Error is expected due to invalid ciphertext, but matching secret skip path was executed
+	_ = resp.Result
 }
 
 func TestPodHandler_Handle_SecretCreateError(t *testing.T) {
@@ -215,8 +214,7 @@ func TestPodHandler_Handle_SecretCreateError(t *testing.T) {
 
 	// Should handle secret creation (may fail on decryption but create path is tested)
 	// We're mainly testing that the secret creation path is executed
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but secret creation path was executed
-	}
+	// Error is expected due to invalid ciphertext, but secret creation path was executed
+	_ = resp.Result
 }
 
