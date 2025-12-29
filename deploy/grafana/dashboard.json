@@ -1,0 +1,322 @@
+{
+  "dashboard": {
+    "title": "zen-lock Controller Dashboard",
+    "tags": ["zen-lock", "kubernetes", "secret-management"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Reconciliations by Result",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_reconcile_total{result=\"success\"}[5m])) * 300",
+            "legendFormat": "Success (5m)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_reconcile_total{result=\"error\"}[5m])) * 300",
+            "legendFormat": "Error (5m)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Webhook Injections by Result",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"success\"}[5m])) * 300",
+            "legendFormat": "Success (5m)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"error\"}[5m])) * 300",
+            "legendFormat": "Error (5m)",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"denied\"}[5m])) * 300",
+            "legendFormat": "Denied (5m)",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Decryption Operations by Result",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_decryption_total{result=\"success\"}[5m])) * 300",
+            "legendFormat": "Success (5m)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_decryption_total{result=\"error\"}[5m])) * 300",
+            "legendFormat": "Error (5m)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Reconciliation Rate",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_reconcile_total[5m]))",
+            "legendFormat": "Reconciliations/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "unit": "ops"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Webhook Injection Rate Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"success\"}[5m])) by (namespace, zenlock_name)",
+            "legendFormat": "{{namespace}}/{{zenlock_name}} - Success",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"error\"}[5m])) by (namespace, zenlock_name)",
+            "legendFormat": "{{namespace}}/{{zenlock_name}} - Error",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"denied\"}[5m])) by (namespace, zenlock_name)",
+            "legendFormat": "{{namespace}}/{{zenlock_name}} - Denied",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Injections/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Webhook Injection Duration (P95/P50)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(zenlock_webhook_injection_duration_seconds_bucket[5m])) by (le, namespace, zenlock_name))",
+            "legendFormat": "P95 - {{namespace}}/{{zenlock_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(zenlock_webhook_injection_duration_seconds_bucket[5m])) by (le, namespace, zenlock_name))",
+            "legendFormat": "P50 - {{namespace}}/{{zenlock_name}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duration"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Reconciliation Duration",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(zenlock_reconcile_duration_seconds_bucket[5m])) by (le, namespace, name))",
+            "legendFormat": "P95 - {{namespace}}/{{name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(zenlock_reconcile_duration_seconds_bucket[5m])) by (le, namespace, name))",
+            "legendFormat": "P50 - {{namespace}}/{{name}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duration"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Decryption Duration (P95/P50)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(zenlock_decryption_duration_seconds_bucket[5m])) by (le, namespace, zenlock_name))",
+            "legendFormat": "P95 - {{namespace}}/{{zenlock_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(zenlock_decryption_duration_seconds_bucket[5m])) by (le, namespace, zenlock_name))",
+            "legendFormat": "P50 - {{namespace}}/{{zenlock_name}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duration"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Error Rate Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "sum(rate(zenlock_reconcile_total{result=\"error\"}[5m]))",
+            "legendFormat": "Reconciliation Errors",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(zenlock_webhook_injection_total{result=\"error\"}[5m]))",
+            "legendFormat": "Webhook Injection Errors",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(zenlock_decryption_total{result=\"error\"}[5m]))",
+            "legendFormat": "Decryption Errors",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Errors/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Top ZenLocks by Injection Count",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(zenlock_webhook_injection_total{result=\"success\"}[5m])) by (namespace, zenlock_name))",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "namespace": 0,
+                "zenlock_name": 1,
+                "Value": 2
+              },
+              "renameByName": {
+                "namespace": "Namespace",
+                "zenlock_name": "ZenLock",
+                "Value": "Injection Rate (ops)"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Top ZenLocks by Decryption Count",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(zenlock_decryption_total{result=\"success\"}[5m])) by (namespace, zenlock_name))",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "namespace": 0,
+                "zenlock_name": 1,
+                "Value": 2
+              },
+              "renameByName": {
+                "namespace": "Namespace",
+                "zenlock_name": "ZenLock",
+                "Value": "Decryption Rate (ops)"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+

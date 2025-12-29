@@ -1,0 +1,134 @@
+# Copyright 2025 Kube-ZEN Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-lock-alerts
+  namespace: zen-lock-system
+  labels:
+    app: zen-lock-webhook
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: zen-lock.rules
+      interval: 30s
+      rules:
+        # Alert when zen-lock controller is down
+        - alert: ZenLockControllerDown
+          expr: up{job="zen-lock-webhook"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: zen-lock-webhook
+          annotations:
+            summary: "zen-lock Controller is down"
+            description: "zen-lock Controller has been down for more than 5 minutes."
+        
+        # Alert on high reconciliation error rate
+        - alert: ZenLockHighReconciliationErrorRate
+          expr: rate(zenlock_reconcile_total{result="error"}[5m]) > 5
+          for: 5m
+          labels:
+            severity: warning
+            component: zen-lock-webhook
+          annotations:
+            summary: "High zen-lock reconciliation error rate detected"
+            description: >
+              zen-lock Controller is experiencing {{ $value }} reconciliation errors per second.
+        
+        # Alert on webhook injection failures
+        - alert: ZenLockWebhookInjectionFailures
+          expr: rate(zenlock_webhook_injection_total{result="error"}[5m]) > 2
+          for: 10m
+          labels:
+            severity: warning
+            component: zen-lock-webhook
+          annotations:
+            summary: "High webhook injection failure rate"
+            description: >
+              zen-lock webhook is failing to inject secrets at a high rate.
+              {{ $value }} failures per second detected.
+        
+        # Alert on webhook injection denials (AllowedSubjects)
+        - alert: ZenLockWebhookInjectionDenials
+          expr: rate(zenlock_webhook_injection_total{result="denied"}[5m]) > 1
+          for: 5m
+          labels:
+            severity: info
+            component: zen-lock-webhook
+          annotations:
+            summary: "Webhook injection denials detected"
+            description: >
+              Pods are being denied secret injection due to AllowedSubjects restrictions.
+              {{ $value }} denials per second detected.
+        
+        # Alert on decryption failures
+        - alert: ZenLockDecryptionFailures
+          expr: rate(zenlock_decryption_total{result="error"}[5m]) > 3
+          for: 10m
+          labels:
+            severity: warning
+            component: zen-lock-webhook
+          annotations:
+            summary: "High decryption failure rate"
+            description: >
+              zen-lock is failing to decrypt secrets at a high rate.
+              {{ $value }} failures per second detected.
+              Check private key configuration and ciphertext validity.
+        
+        # Alert on slow reconciliation duration
+        - alert: ZenLockSlowReconciliation
+          expr: >
+            histogram_quantile(0.95,
+            rate(zenlock_reconcile_duration_seconds_bucket[5m])) > 5
+          for: 10m
+          labels:
+            severity: warning
+            component: zen-lock-webhook
+          annotations:
+            summary: "Slow reconciliation detected"
+            description: >
+              95th percentile reconciliation duration is high ({{ $value }}s).
+        
+        # Alert on slow webhook injection duration
+        - alert: ZenLockSlowWebhookInjection
+          expr: >
+            histogram_quantile(0.95,
+            rate(zenlock_webhook_injection_duration_seconds_bucket[5m])) > 2
+          for: 10m
+          labels:
+            severity: warning
+            component: zen-lock-webhook
+          annotations:
+            summary: "Slow webhook injection detected"
+            description: >
+              95th percentile webhook injection duration is high ({{ $value }}s).
+              This may indicate performance issues with secret decryption or API calls.
+        
+        # Alert on slow decryption duration
+        - alert: ZenLockSlowDecryption
+          expr: >
+            histogram_quantile(0.95,
+            rate(zenlock_decryption_duration_seconds_bucket[5m])) > 1
+          for: 10m
+          labels:
+            severity: warning
+            component: zen-lock-webhook
+          annotations:
+            summary: "Slow decryption detected"
+            description: >
+              95th percentile decryption duration is high ({{ $value }}s).
+              This may indicate issues with the encryption key or ciphertext size.
+

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -12,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
 
@@ -47,6 +49,7 @@ func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLoc
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	startTime := time.Now()
 
 	// Fetch ZenLock
 	zenlock := &securityv1alpha1.ZenLock{}
@@ -59,19 +62,33 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if privateKey == "" {
 		logger.Error(fmt.Errorf("ZEN_LOCK_PRIVATE_KEY not set"), "Cannot decrypt ZenLock")
 		r.updateStatus(ctx, zenlock, "Error", "KeyNotFound", "Private key not configured")
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordReconcile(req.Namespace, req.Name, "error", duration)
 		return ctrl.Result{}, nil
 	}
 
 	// Try to decrypt to verify the secret is valid
+	decryptStart := time.Now()
 	_, err := r.crypto.DecryptMap(zenlock.Spec.EncryptedData, privateKey)
+	decryptDuration := time.Since(decryptStart).Seconds()
 	if err != nil {
 		logger.Error(err, "Failed to decrypt ZenLock", "name", zenlock.Name)
 		r.updateStatus(ctx, zenlock, "Error", "DecryptionFailed", fmt.Sprintf("Decryption failed: %v", err))
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordReconcile(req.Namespace, req.Name, "error", duration)
+		metrics.RecordDecryption(req.Namespace, req.Name, "error", decryptDuration)
 		return ctrl.Result{}, nil
 	}
 
+	// Record successful decryption
+	metrics.RecordDecryption(req.Namespace, req.Name, "success", decryptDuration)
+
 	// Update status to Ready
 	r.updateStatus(ctx, zenlock, "Ready", "KeyValid", "Private key loaded and decryption successful")
+
+	// Record successful reconciliation
+	duration := time.Since(startTime).Seconds()
+	metrics.RecordReconcile(req.Namespace, req.Name, "success", duration)
 
 	return ctrl.Result{}, nil
 }

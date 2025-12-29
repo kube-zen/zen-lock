@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
 
@@ -65,6 +66,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	startTime := time.Now()
+
 	// Decode Pod
 	pod := &corev1.Pod{}
 	if err := h.decoder.Decode(req, pod); err != nil {
@@ -91,6 +94,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	}
 
 	if err := h.Client.Get(ctx, zenlockKey, zenlock); err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 		return admission.Errored(http.StatusInternalServerError,
 			fmt.Errorf("failed to fetch ZenLock %q: %w", injectName, err))
 	}
@@ -98,16 +103,26 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	// Validate AllowedSubjects if specified
 	if len(zenlock.Spec.AllowedSubjects) > 0 {
 		if err := h.validateAllowedSubjects(ctx, pod, zenlock.Spec.AllowedSubjects); err != nil {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(req.Namespace, injectName, "denied", duration)
 			return admission.Denied(fmt.Sprintf("Pod ServiceAccount not allowed to use ZenLock %q: %v", injectName, err))
 		}
 	}
 
 	// Decrypt data
+	decryptStart := time.Now()
 	decryptedMap, err := h.crypto.DecryptMap(zenlock.Spec.EncryptedData, h.privateKey)
+	decryptDuration := time.Since(decryptStart).Seconds()
 	if err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+		metrics.RecordDecryption(req.Namespace, injectName, "error", decryptDuration)
 		return admission.Errored(http.StatusInternalServerError,
 			fmt.Errorf("failed to decrypt ZenLock %q: %w", injectName, err))
 	}
+
+	// Record successful decryption
+	metrics.RecordDecryption(req.Namespace, injectName, "success", decryptDuration)
 
 	// Convert decrypted map to Kubernetes Secret format (base64-encoded strings)
 	secretData := make(map[string][]byte)
@@ -140,6 +155,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	if err := h.Client.Create(ctx, secret); err != nil {
 		// If secret already exists (idempotency), that's okay
 		if !k8serrors.IsAlreadyExists(err) {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 			return admission.Errored(http.StatusInternalServerError,
 				fmt.Errorf("failed to create ephemeral secret: %w", err))
 		}
@@ -148,9 +165,15 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	// Create JSON patch to add volume and volume mounts
 	patch, err := h.createPatch(pod, secretName, mountPath)
 	if err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 		return admission.Errored(http.StatusInternalServerError,
 			fmt.Errorf("failed to create patch: %w", err))
 	}
+
+	// Record successful injection
+	duration := time.Since(startTime).Seconds()
+	metrics.RecordWebhookInjection(req.Namespace, injectName, "success", duration)
 
 	return admission.PatchResponseFromRaw(req.Object.Raw, patch)
 }

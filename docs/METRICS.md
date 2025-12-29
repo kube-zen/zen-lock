@@ -1,0 +1,227 @@
+# Metrics Documentation
+
+This document describes all Prometheus metrics exposed by the zen-lock controller and webhook.
+
+## Metrics Endpoint
+
+The zen-lock controller exposes metrics on the `/metrics` endpoint, defaulting to port `8080`.
+
+## Available Metrics
+
+### `zenlock_reconcile_total`
+**Type**: Counter  
+**Description**: Total number of ZenLock reconciliations  
+**Labels**:
+- `namespace`: Namespace of the ZenLock
+- `name`: Name of the ZenLock
+- `result`: Result of reconciliation (`success`, `error`)
+
+**Example**:
+```
+zenlock_reconcile_total{namespace="default",name="app-secrets",result="success"} 150
+zenlock_reconcile_total{namespace="default",name="app-secrets",result="error"} 2
+```
+
+---
+
+### `zenlock_reconcile_duration_seconds`
+**Type**: Histogram  
+**Description**: Duration of ZenLock reconciliations in seconds  
+**Labels**:
+- `namespace`: Namespace of the ZenLock
+- `name`: Name of the ZenLock
+
+**Buckets**: Exponential buckets from 0.001s to ~1s (0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024)
+
+**Example**:
+```
+zenlock_reconcile_duration_seconds_bucket{namespace="default",name="app-secrets",le="0.1"} 145
+zenlock_reconcile_duration_seconds_sum{namespace="default",name="app-secrets"} 12.5
+zenlock_reconcile_duration_seconds_count{namespace="default",name="app-secrets"} 150
+```
+
+---
+
+### `zenlock_webhook_injection_total`
+**Type**: Counter  
+**Description**: Total number of webhook secret injections  
+**Labels**:
+- `namespace`: Namespace of the Pod
+- `zenlock_name`: Name of the ZenLock being injected
+- `result`: Result of injection (`success`, `error`, `denied`)
+
+**Example**:
+```
+zenlock_webhook_injection_total{namespace="default",zenlock_name="app-secrets",result="success"} 500
+zenlock_webhook_injection_total{namespace="default",zenlock_name="app-secrets",result="denied"} 5
+zenlock_webhook_injection_total{namespace="default",zenlock_name="app-secrets",result="error"} 2
+```
+
+---
+
+### `zenlock_webhook_injection_duration_seconds`
+**Type**: Histogram  
+**Description**: Duration of webhook secret injections in seconds  
+**Labels**:
+- `namespace`: Namespace of the Pod
+- `zenlock_name`: Name of the ZenLock being injected
+
+**Buckets**: Exponential buckets from 0.001s to ~1s
+
+**Example**:
+```
+zenlock_webhook_injection_duration_seconds_bucket{namespace="default",zenlock_name="app-secrets",le="0.1"} 495
+zenlock_webhook_injection_duration_seconds_sum{namespace="default",zenlock_name="app-secrets"} 25.3
+zenlock_webhook_injection_duration_seconds_count{namespace="default",zenlock_name="app-secrets"} 500
+```
+
+---
+
+### `zenlock_decryption_total`
+**Type**: Counter  
+**Description**: Total number of decryption operations  
+**Labels**:
+- `namespace`: Namespace of the ZenLock
+- `zenlock_name`: Name of the ZenLock
+- `result`: Result of decryption (`success`, `error`)
+
+**Example**:
+```
+zenlock_decryption_total{namespace="default",zenlock_name="app-secrets",result="success"} 650
+zenlock_decryption_total{namespace="default",zenlock_name="app-secrets",result="error"} 1
+```
+
+---
+
+### `zenlock_decryption_duration_seconds`
+**Type**: Histogram  
+**Description**: Duration of decryption operations in seconds  
+**Labels**:
+- `namespace`: Namespace of the ZenLock
+- `zenlock_name`: Name of the ZenLock
+
+**Buckets**: Exponential buckets from 0.001s to ~1s
+
+**Example**:
+```
+zenlock_decryption_duration_seconds_bucket{namespace="default",zenlock_name="app-secrets",le="0.01"} 640
+zenlock_decryption_duration_seconds_sum{namespace="default",zenlock_name="app-secrets"} 3.2
+zenlock_decryption_duration_seconds_count{namespace="default",zenlock_name="app-secrets"} 650
+```
+
+---
+
+## Prometheus Queries
+
+### Reconciliation Success Rate
+```promql
+sum(rate(zenlock_reconcile_total{result="success"}[5m])) 
+/ 
+sum(rate(zenlock_reconcile_total[5m])) * 100
+```
+
+### Webhook Injection Success Rate
+```promql
+sum(rate(zenlock_webhook_injection_total{result="success"}[5m])) 
+/ 
+sum(rate(zenlock_webhook_injection_total[5m])) * 100
+```
+
+### Decryption Success Rate
+```promql
+sum(rate(zenlock_decryption_total{result="success"}[5m])) 
+/ 
+sum(rate(zenlock_decryption_total[5m])) * 100
+```
+
+### P95 Reconciliation Duration
+```promql
+histogram_quantile(0.95, 
+  sum(rate(zenlock_reconcile_duration_seconds_bucket[5m])) by (le, namespace, name)
+)
+```
+
+### P95 Webhook Injection Duration
+```promql
+histogram_quantile(0.95, 
+  sum(rate(zenlock_webhook_injection_duration_seconds_bucket[5m])) by (le, namespace, zenlock_name)
+)
+```
+
+### P95 Decryption Duration
+```promql
+histogram_quantile(0.95, 
+  sum(rate(zenlock_decryption_duration_seconds_bucket[5m])) by (le, namespace, zenlock_name)
+)
+```
+
+### Error Rate by Type
+```promql
+sum(rate(zenlock_reconcile_total{result="error"}[5m])) by (namespace, name)
+```
+
+### Webhook Denial Rate (AllowedSubjects)
+```promql
+sum(rate(zenlock_webhook_injection_total{result="denied"}[5m])) by (namespace, zenlock_name)
+```
+
+### Top ZenLocks by Injection Count
+```promql
+topk(10, sum(rate(zenlock_webhook_injection_total{result="success"}[5m])) by (namespace, zenlock_name))
+```
+
+---
+
+## Grafana Dashboard
+
+A Grafana dashboard is available at `deploy/grafana/dashboard.json` with pre-configured panels for:
+- Reconciliation metrics
+- Webhook injection metrics
+- Decryption metrics
+- Error rates
+- Duration histograms
+- Top ZenLocks by usage
+
+See [Grafana Dashboard README](../deploy/grafana/README.md) for installation instructions.
+
+---
+
+## Alerting Rules
+
+Prometheus alerting rules are available at `deploy/prometheus/prometheus-rules.yaml`:
+
+- **ZenLockControllerDown**: Alerts when controller is down
+- **ZenLockHighReconciliationErrorRate**: Alerts on high reconciliation error rates (>5 errors/sec)
+- **ZenLockWebhookInjectionFailures**: Alerts on webhook injection failures (>2 failures/sec)
+- **ZenLockWebhookInjectionDenials**: Alerts on injection denials (AllowedSubjects violations)
+- **ZenLockDecryptionFailures**: Alerts on decryption failures (>3 failures/sec)
+- **ZenLockSlowReconciliation**: Alerts on slow reconciliations (P95 >5s)
+- **ZenLockSlowWebhookInjection**: Alerts on slow webhook injections (P95 >2s)
+- **ZenLockSlowDecryption**: Alerts on slow decryption operations (P95 >1s)
+
+---
+
+## Metric Collection Flow
+
+1. **Controller Reconciliation**:
+   - `Reconcile()` is called for each ZenLock
+   - Metrics recorded: `zenlock_reconcile_total`, `zenlock_reconcile_duration_seconds`
+   - Decryption metrics recorded: `zenlock_decryption_total`, `zenlock_decryption_duration_seconds`
+
+2. **Webhook Injection**:
+   - `Handle()` processes Pod admission requests
+   - Metrics recorded: `zenlock_webhook_injection_total`, `zenlock_webhook_injection_duration_seconds`
+   - Decryption metrics recorded during secret decryption
+
+3. **Metrics Exposure**:
+   - Controller-runtime automatically exposes metrics via `/metrics` endpoint
+   - Prometheus scrapes metrics from port `8080`
+
+---
+
+## See Also
+
+- [Architecture](ARCHITECTURE.md) - How metrics are collected
+- [Prometheus Rules](../deploy/prometheus/prometheus-rules.yaml) - Alerting rules
+- [Grafana Dashboard](../deploy/grafana/dashboard.json) - Dashboard definition
+
