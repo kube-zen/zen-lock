@@ -19,24 +19,23 @@ spec:
         zen-lock/mount-path: "/etc/config"
     spec:
       containers:
-      - name: app
-        image: nginx:latest
-        volumeMounts:
-        - name: zen-secrets
-          mountPath: /etc/config
-          readOnly: true
-        # Example: Use the secret as environment variable
-        env:
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: zen-lock-inject-$(POD_UID)
-              key: DB_USER
-        command:
-        - sh
-        - -c
-        - |
-          echo "DB_USER: $(cat /etc/config/DB_USER)"
-          echo "DB_PASS: $(cat /etc/config/DB_PASS)"
-          sleep 3600
-
+        - name: app
+          image: nginx:latest
+          volumeMounts:
+            - name: zen-secrets
+              mountPath: /etc/config
+              readOnly: true
+          # Example: Use the secret as environment variable
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: zen-lock-inject-$(POD_UID)
+                  key: DB_USER
+          command:
+            - sh
+            - -c
+            - |
+              echo "DB_USER: $(cat /etc/config/DB_USER)"
+              echo "DB_PASS: $(cat /etc/config/DB_PASS)"
+              sleep 3600

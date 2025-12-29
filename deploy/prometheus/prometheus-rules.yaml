@@ -16,10 +16,10 @@ kind: PrometheusRule
 metadata:
   name: zen-lock-alerts
   namespace: zen-lock-system
-          labels:
-            app: zen-lock
-            prometheus: kube-prometheus
-            role: alert-rules
+  labels:
+    app: zen-lock
+    prometheus: kube-prometheus
+    role: alert-rules
 spec:
   groups:
     - name: zen-lock.rules
@@ -171,4 +171,3 @@ spec:
             description: >
               zen-lock is experiencing {{ $value }} algorithm validation failures per second.
               Check ZenLock CRDs for algorithm configuration errors.
-

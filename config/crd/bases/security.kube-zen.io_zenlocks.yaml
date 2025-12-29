@@ -11,12 +11,12 @@ spec:
     listKind: ZenLockList
     plural: zenlocks
     shortNames:
-    - zl
-    - zenlock
+      - zl
+      - zenlock
     singular: zenlock
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
+    - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
