@@ -144,9 +144,7 @@ func TestPodHandler_Handle_SecretGetError(t *testing.T) {
 	resp := handler.Handle(ctx, req)
 
 	// Should handle secret operations (may fail on decryption but paths are tested)
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but secret operation paths were executed
-	}
+	_ = resp.Result // Acknowledge result for testing purposes
 }
 
 func TestPodHandler_Handle_MutatePodError(t *testing.T) {
@@ -174,7 +172,7 @@ func TestPodHandler_Handle_MutatePodError(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject:  "test-zenlock",
+				annotationInject:    "test-zenlock",
 				annotationMountPath: "/zen-lock/secrets", // Valid path
 			},
 		},
@@ -197,8 +195,5 @@ func TestPodHandler_Handle_MutatePodError(t *testing.T) {
 	resp := handler.Handle(ctx, req)
 
 	// Should handle pod mutation (may fail on decryption but mutation path is tested)
-	if resp.Result != nil && resp.Result.Message != "" {
-		// Error is expected due to invalid ciphertext, but mutation path was executed
-	}
+	_ = resp.Result // Acknowledge result for testing purposes
 }
-
