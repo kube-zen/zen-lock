@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
@@ -33,7 +32,7 @@ func TestSecretReconciler_SetupWithManager(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	reconciler := NewSecretReconciler(client, scheme)
+	_ = NewSecretReconciler(client, scheme)
 
 	// Note: SetupWithManager requires a real manager with rest.Config, which requires envtest
 	// In unit tests, we can't easily create a manager without envtest setup

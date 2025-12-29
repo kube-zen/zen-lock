@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 )
@@ -47,7 +46,7 @@ func TestZenLockReconciler_SetupWithManager(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	reconciler, err := NewZenLockReconciler(client, scheme)
+	_, err := NewZenLockReconciler(client, scheme)
 	if err != nil {
 		t.Fatalf("Failed to create reconciler: %v", err)
 	}

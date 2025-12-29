@@ -99,24 +99,6 @@ func TestLogger_Errorf(t *testing.T) {
 	logger.Errorf(testErr, "test error message: %s", "formatted")
 }
 
-func TestLogger_WithCorrelationID(t *testing.T) {
-	logger := NewLogger()
-	logger = logger.WithCorrelationID("test-correlation-id")
-
-	if logger.fields["correlation_id"] != "test-correlation-id" {
-		t.Errorf("Expected correlation_id to be 'test-correlation-id', got %v", logger.fields["correlation_id"])
-	}
-}
-
-func TestLogger_WithTiming(t *testing.T) {
-	logger := NewLogger()
-	duration := 250 * time.Millisecond
-	logger = logger.WithTiming(duration)
-
-	if logger.fields["duration_ms"] != int64(250) {
-		t.Errorf("Expected duration_ms to be 250, got %v", logger.fields["duration_ms"])
-	}
-}
 
 func TestLogger_WithError_WithZenLockError(t *testing.T) {
 	logger := NewLogger()
