@@ -79,6 +79,33 @@ var (
 		},
 		[]string{"namespace", "zenlock_name"},
 	)
+
+	// ZenLockCacheHits counts cache hits for ZenLock lookups.
+	ZenLockCacheHits = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zenlock_cache_hits_total",
+			Help: "Total number of ZenLock cache hits",
+		},
+		[]string{"namespace", "zenlock_name"},
+	)
+
+	// ZenLockCacheMisses counts cache misses for ZenLock lookups.
+	ZenLockCacheMisses = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zenlock_cache_misses_total",
+			Help: "Total number of ZenLock cache misses",
+		},
+		[]string{"namespace", "zenlock_name"},
+	)
+
+	// WebhookValidationFailures counts validation failures in webhook.
+	WebhookValidationFailures = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zenlock_webhook_validation_failures_total",
+			Help: "Total number of webhook validation failures",
+		},
+		[]string{"namespace", "reason"},
+	)
 )
 
 // RecordReconcile records a reconciliation metric.
@@ -97,4 +124,19 @@ func RecordWebhookInjection(namespace, zenlockName, result string, duration floa
 func RecordDecryption(namespace, zenlockName, result string, duration float64) {
 	DecryptionTotal.WithLabelValues(namespace, zenlockName, result).Inc()
 	DecryptionDuration.WithLabelValues(namespace, zenlockName).Observe(duration)
+}
+
+// RecordCacheHit records a cache hit.
+func RecordCacheHit(namespace, zenlockName string) {
+	ZenLockCacheHits.WithLabelValues(namespace, zenlockName).Inc()
+}
+
+// RecordCacheMiss records a cache miss.
+func RecordCacheMiss(namespace, zenlockName string) {
+	ZenLockCacheMisses.WithLabelValues(namespace, zenlockName).Inc()
+}
+
+// RecordValidationFailure records a validation failure.
+func RecordValidationFailure(namespace, reason string) {
+	WebhookValidationFailures.WithLabelValues(namespace, reason).Inc()
 }

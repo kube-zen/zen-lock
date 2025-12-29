@@ -111,6 +111,56 @@ zenlock_decryption_duration_seconds_count{namespace="default",zenlock_name="app-
 
 ---
 
+### `zenlock_cache_hits_total`
+**Type**: Counter  
+**Description**: Total number of ZenLock cache hits (reduces API server load)  
+**Labels**:
+- `namespace`: Namespace of the ZenLock
+- `zenlock_name`: Name of the ZenLock
+
+**Example**:
+```
+zenlock_cache_hits_total{namespace="default",zenlock_name="app-secrets"} 450
+```
+
+---
+
+### `zenlock_cache_misses_total`
+**Type**: Counter  
+**Description**: Total number of ZenLock cache misses (API server lookups)  
+**Labels**:
+- `namespace`: Namespace of the ZenLock
+- `zenlock_name`: Name of the ZenLock
+
+**Example**:
+```
+zenlock_cache_misses_total{namespace="default",zenlock_name="app-secrets"} 50
+```
+
+**Cache Hit Rate**:
+```promql
+sum(rate(zenlock_cache_hits_total[5m])) 
+/ 
+(sum(rate(zenlock_cache_hits_total[5m])) + sum(rate(zenlock_cache_misses_total[5m]))) * 100
+```
+
+---
+
+### `zenlock_webhook_validation_failures_total`
+**Type**: Counter  
+**Description**: Total number of webhook validation failures  
+**Labels**:
+- `namespace`: Namespace of the Pod
+- `reason`: Reason for validation failure (`invalid_inject_annotation`, `invalid_mount_path`, etc.)
+
+**Example**:
+```
+zenlock_webhook_validation_failures_total{namespace="default",reason="invalid_inject_annotation"} 2
+zenlock_webhook_validation_failures_total{namespace="default",reason="invalid_mount_path"} 1
+```
+
+---
+
 ## Prometheus Queries
 
 ### Reconciliation Success Rate

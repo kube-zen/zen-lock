@@ -73,13 +73,14 @@ type PodHandler struct {
 	decoder    admission.Decoder
 	crypto     crypto.Encryptor
 	privateKey string
+	cache      *ZenLockCache
 }
 
 // NewPodHandler creates a new PodHandler
 func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, error) {
 	decoder := admission.NewDecoder(scheme)
 
-	// Load private key from environment
+	// Load private key from environment (cached in handler)
 	privateKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
 	if privateKey == "" {
 		return nil, fmt.Errorf("ZEN_LOCK_PRIVATE_KEY environment variable is not set")
@@ -88,11 +89,21 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 	// Initialize crypto
 	encryptor := crypto.NewAgeEncryptor()
 
+	// Initialize cache with 5 minute TTL (configurable via env in future)
+	cacheTTL := 5 * time.Minute
+	if ttlStr := os.Getenv("ZEN_LOCK_CACHE_TTL"); ttlStr != "" {
+		if parsedTTL, err := time.ParseDuration(ttlStr); err == nil {
+			cacheTTL = parsedTTL
+		}
+	}
+	cache := NewZenLockCache(cacheTTL)
+
 	return &PodHandler{
 		Client:     client,
 		decoder:    decoder,
 		crypto:     encryptor,
 		privateKey: privateKey,
+		cache:      cache,
 	}, nil
 }
 
@@ -116,24 +127,51 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		return admission.Allowed("no zen-lock injection requested")
 	}
 
+	// Validate inject annotation
+	if err := ValidateInjectAnnotation(injectName); err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+		metrics.RecordValidationFailure(req.Namespace, "invalid_inject_annotation")
+		return admission.Denied(fmt.Sprintf("invalid inject annotation: %v", err))
+	}
+
 	// Get mount path from annotation or use default
 	mountPath := pod.GetAnnotations()[annotationMountPath]
 	if mountPath == "" {
 		mountPath = defaultMountPath
+	} else {
+		// Validate mount path if provided
+		if err := ValidateMountPath(mountPath); err != nil {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+			metrics.RecordValidationFailure(req.Namespace, "invalid_mount_path")
+			return admission.Denied(fmt.Sprintf("invalid mount path: %v", err))
+		}
 	}
 
-	// Fetch ZenLock CRD
-	zenlock := &securityv1alpha1.ZenLock{}
+	// Fetch ZenLock CRD (with caching)
 	zenlockKey := types.NamespacedName{
 		Name:      injectName,
 		Namespace: req.Namespace,
 	}
 
-	if err := h.Client.Get(ctx, zenlockKey, zenlock); err != nil {
-		duration := time.Since(startTime).Seconds()
-		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-		return admission.Errored(http.StatusInternalServerError,
-			fmt.Errorf("failed to fetch ZenLock %q: %w", injectName, err))
+	// Try cache first
+	zenlock, cacheHit := h.cache.Get(zenlockKey)
+	if cacheHit {
+		metrics.RecordCacheHit(req.Namespace, injectName)
+	} else {
+		metrics.RecordCacheMiss(req.Namespace, injectName)
+		// Fetch from API server
+		zenlock = &securityv1alpha1.ZenLock{}
+		if err := h.Client.Get(ctx, zenlockKey, zenlock); err != nil {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+			// Sanitize error to prevent information leakage
+			sanitizedErr := SanitizeError(err, "fetch ZenLock")
+			return admission.Errored(http.StatusInternalServerError, sanitizedErr)
+		}
+		// Cache the result
+		h.cache.Set(zenlockKey, zenlock)
 	}
 
 	// Validate AllowedSubjects if specified
@@ -153,8 +191,11 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		duration := time.Since(startTime).Seconds()
 		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 		metrics.RecordDecryption(req.Namespace, injectName, "error", decryptDuration)
-		return admission.Errored(http.StatusInternalServerError,
-			fmt.Errorf("failed to decrypt ZenLock %q: %w", injectName, err))
+		// Invalidate cache on decryption failure (might be stale)
+		h.cache.Invalidate(zenlockKey)
+		// Sanitize error to prevent information leakage
+		sanitizedErr := SanitizeError(err, "decrypt ZenLock")
+		return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 	}
 
 	// Record successful decryption
@@ -193,8 +234,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 			if err := h.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: req.Namespace}, existingSecret); err != nil {
 				duration := time.Since(startTime).Seconds()
 				metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-				return admission.Errored(http.StatusInternalServerError,
-					fmt.Errorf("failed to fetch existing secret for validation: %w", err))
+				sanitizedErr := SanitizeError(err, "fetch existing secret")
+				return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 			}
 
 			// Ensure labels map is initialized (defense against nil labels from legacy/collision Secrets)
@@ -213,8 +254,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 				if err := h.Client.Update(ctx, existingSecret); err != nil {
 					duration := time.Since(startTime).Seconds()
 					metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-					return admission.Errored(http.StatusInternalServerError,
-						fmt.Errorf("failed to update stale secret: %w", err))
+					sanitizedErr := SanitizeError(err, "update stale secret")
+					return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 				}
 			} else {
 				// Secret exists and matches current ZenLock - verify data matches (defense in depth)
@@ -236,8 +277,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 					if err := h.Client.Update(ctx, existingSecret); err != nil {
 						duration := time.Since(startTime).Seconds()
 						metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-						return admission.Errored(http.StatusInternalServerError,
-							fmt.Errorf("failed to refresh secret data: %w", err))
+						sanitizedErr := SanitizeError(err, "refresh secret data")
+						return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 					}
 				}
 			}
@@ -246,8 +287,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 			// Other error creating secret
 			duration := time.Since(startTime).Seconds()
 			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-			return admission.Errored(http.StatusInternalServerError,
-				fmt.Errorf("failed to create ephemeral secret: %w", err))
+			sanitizedErr := SanitizeError(err, "create ephemeral secret")
+			return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 		}
 	}
 
@@ -256,8 +297,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	if err := h.mutatePod(mutatedPod, secretName, mountPath); err != nil {
 		duration := time.Since(startTime).Seconds()
 		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-		return admission.Errored(http.StatusInternalServerError,
-			fmt.Errorf("failed to mutate pod: %w", err))
+		sanitizedErr := SanitizeError(err, "mutate pod")
+		return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 	}
 
 	// Marshal mutated pod
@@ -265,8 +306,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	if err != nil {
 		duration := time.Since(startTime).Seconds()
 		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-		return admission.Errored(http.StatusInternalServerError,
-			fmt.Errorf("failed to marshal mutated pod: %w", err))
+		sanitizedErr := SanitizeError(err, "marshal mutated pod")
+		return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 	}
 
 	// Record successful injection
