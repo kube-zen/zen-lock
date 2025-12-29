@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,6 +158,7 @@ func TestSecretReconciler_RequeuesWhenPodNotExists(t *testing.T) {
 	reconciler, clientBuilder := setupSecretReconciler(t)
 
 	// Create Secret with zen-lock labels but Pod doesn't exist
+	// Use a recent timestamp so it won't be deleted as orphaned
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "zen-lock-secret",
@@ -166,6 +168,7 @@ func TestSecretReconciler_RequeuesWhenPodNotExists(t *testing.T) {
 				labelPodNamespace: "default",
 				labelZenLockName:  "test-zenlock",
 			},
+			CreationTimestamp: metav1.Now(), // Recent timestamp
 		},
 		Data: map[string][]byte{
 			"key": []byte("value"),
@@ -189,14 +192,66 @@ func TestSecretReconciler_RequeuesWhenPodNotExists(t *testing.T) {
 		t.Errorf("Reconcile() error = %v", err)
 	}
 
-	// When Pod doesn't exist, reconciler requeues with a delay
+	// When Pod doesn't exist and Secret is recent, reconciler requeues with a delay
 	if result.RequeueAfter == 0 {
 		t.Error("Reconcile() should set RequeueAfter when Pod doesn't exist")
 	}
 
 	// RequeueAfter should be 5 seconds (as per implementation)
-	if result.RequeueAfter != 5 {
-		t.Errorf("Reconcile() RequeueAfter = %v, want 5", result.RequeueAfter)
+	expectedDelay := 5 * time.Second
+	if result.RequeueAfter != expectedDelay {
+		t.Errorf("Reconcile() RequeueAfter = %v, want %v", result.RequeueAfter, expectedDelay)
+	}
+}
+
+func TestSecretReconciler_DeletesOrphanedSecret(t *testing.T) {
+	reconciler, clientBuilder := setupSecretReconciler(t)
+
+	// Create Secret with zen-lock labels but Pod doesn't exist
+	// Use an old timestamp so it will be deleted as orphaned
+	oldTime := metav1.NewTime(time.Now().Add(-2 * time.Minute)) // 2 minutes ago
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "zen-lock-secret",
+			Namespace: "default",
+			Labels: map[string]string{
+				labelPodName:      "non-existent-pod",
+				labelPodNamespace: "default",
+				labelZenLockName:  "test-zenlock",
+			},
+			CreationTimestamp: oldTime, // Old timestamp
+		},
+		Data: map[string][]byte{
+			"key": []byte("value"),
+		},
+	}
+
+	client := clientBuilder.WithObjects(secret).Build()
+	reconciler.Client = client
+
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "zen-lock-secret",
+			Namespace: "default",
+		},
+	}
+
+	ctx := context.Background()
+	result, err := reconciler.Reconcile(ctx, req)
+
+	if err != nil {
+		t.Errorf("Reconcile() error = %v", err)
+	}
+
+	// Should not requeue when deleting orphaned secret
+	if result.Requeue {
+		t.Error("Reconcile() should not requeue when deleting orphaned secret")
+	}
+
+	// Verify Secret was deleted
+	updatedSecret := &corev1.Secret{}
+	if err := client.Get(ctx, req.NamespacedName, updatedSecret); err == nil {
+		t.Error("Expected Secret to be deleted")
 	}
 }
 
@@ -256,8 +311,9 @@ func TestSecretReconciler_RequeuesWhenPodHasNoUID(t *testing.T) {
 	}
 
 	// RequeueAfter should be 2 seconds (as per implementation)
-	if result.RequeueAfter != 2 {
-		t.Errorf("Reconcile() RequeueAfter = %v, want 2", result.RequeueAfter)
+	expectedDelay := 2 * time.Second
+	if result.RequeueAfter != expectedDelay {
+		t.Errorf("Reconcile() RequeueAfter = %v, want %v", result.RequeueAfter, expectedDelay)
 	}
 }
 
@@ -335,4 +391,3 @@ func TestSecretReconciler_SkipsWhenOwnerReferenceExists(t *testing.T) {
 		t.Errorf("Expected 1 OwnerReference, got %d", len(updatedSecret.OwnerReferences))
 	}
 }
-

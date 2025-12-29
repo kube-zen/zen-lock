@@ -171,14 +171,64 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 
 	// Create the secret
 	if err := h.Client.Create(ctx, secret); err != nil {
-		// If secret already exists (idempotency), that's okay - use existing secret
-		if !k8serrors.IsAlreadyExists(err) {
+		// If secret already exists, validate it's not stale
+		if k8serrors.IsAlreadyExists(err) {
+			// Fetch existing secret to validate it matches current ZenLock data
+			existingSecret := &corev1.Secret{}
+			if err := h.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: req.Namespace}, existingSecret); err != nil {
+				duration := time.Since(startTime).Seconds()
+				metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("failed to fetch existing secret for validation: %w", err))
+			}
+
+			// Check if existing secret matches current ZenLock (by comparing ZenLock name label)
+			existingZenLockName, hasZenLockLabel := existingSecret.Labels[labelZenLockName]
+			if !hasZenLockLabel || existingZenLockName != injectName {
+				// Secret exists but is for a different ZenLock - this is stale, update it
+				existingSecret.Data = secretData
+				existingSecret.Labels[labelZenLockName] = injectName
+				existingSecret.Labels[labelPodName] = pod.Name
+				existingSecret.Labels[labelPodNamespace] = req.Namespace
+				if err := h.Client.Update(ctx, existingSecret); err != nil {
+					duration := time.Since(startTime).Seconds()
+					metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+					return admission.Errored(http.StatusInternalServerError,
+						fmt.Errorf("failed to update stale secret: %w", err))
+				}
+			} else {
+				// Secret exists and matches current ZenLock - verify data matches (defense in depth)
+				// If ZenLock was updated, secret data should be refreshed
+				dataMatches := true
+				if len(existingSecret.Data) != len(secretData) {
+					dataMatches = false
+				} else {
+					for k, v := range secretData {
+						if existingVal, ok := existingSecret.Data[k]; !ok || string(existingVal) != string(v) {
+							dataMatches = false
+							break
+						}
+					}
+				}
+				if !dataMatches {
+					// Data doesn't match - update secret with fresh data
+					existingSecret.Data = secretData
+					if err := h.Client.Update(ctx, existingSecret); err != nil {
+						duration := time.Since(startTime).Seconds()
+						metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+						return admission.Errored(http.StatusInternalServerError,
+							fmt.Errorf("failed to refresh secret data: %w", err))
+					}
+				}
+			}
+			// Secret already exists and is valid - continue with injection
+		} else {
+			// Other error creating secret
 			duration := time.Since(startTime).Seconds()
 			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 			return admission.Errored(http.StatusInternalServerError,
 				fmt.Errorf("failed to create ephemeral secret: %w", err))
 		}
-		// Secret already exists - this is fine for idempotency
 	}
 
 	// Mutate Pod object in-memory (correct pattern for PatchResponseFromRaw)

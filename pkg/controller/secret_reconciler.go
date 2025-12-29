@@ -3,8 +3,10 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,15 +70,32 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Namespace: podNamespace,
 	}
 	if err := r.Get(ctx, podKey, pod); err != nil {
-		// Pod doesn't exist yet or was deleted - this is fine, we'll retry
-		logger.V(4).Info("Pod not found for Secret, will retry", "pod", podKey, "secret", req.NamespacedName)
-		return ctrl.Result{RequeueAfter: 5}, nil
+		// Pod doesn't exist - check if this is a stale/orphaned secret
+		if k8serrors.IsNotFound(err) {
+			// Check if Secret has been orphaned for a while (no OwnerReference means Pod was never created or was deleted)
+			// If Secret is old enough (created more than 1 minute ago), it's likely orphaned
+			secretAge := time.Since(secret.CreationTimestamp.Time)
+			if secretAge > 1*time.Minute {
+				// Secret is orphaned - delete it
+				logger.Info("Deleting orphaned zen-lock secret (Pod not found)", "secret", req.NamespacedName, "pod", podKey, "age", secretAge)
+				if err := r.Delete(ctx, secret); err != nil {
+					logger.Error(err, "Failed to delete orphaned zen-lock secret", "secret", req.NamespacedName)
+					return ctrl.Result{}, fmt.Errorf("failed to delete orphaned secret: %w", err)
+				}
+				return ctrl.Result{}, nil
+			}
+			// Secret is new, Pod might be created soon - retry
+			logger.V(4).Info("Pod not found for Secret, will retry", "pod", podKey, "secret", req.NamespacedName, "age", secretAge)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		logger.Error(err, "Failed to get Pod for zen-lock secret", "secret", req.NamespacedName, "pod", podKey)
+		return ctrl.Result{}, fmt.Errorf("failed to get Pod: %w", err)
 	}
 
 	// Pod exists and has UID - set OwnerReference
 	if pod.UID == "" {
 		logger.V(4).Info("Pod exists but has no UID yet, will retry", "pod", podKey)
-		return ctrl.Result{RequeueAfter: 2}, nil
+		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 
 	// Create OwnerReference

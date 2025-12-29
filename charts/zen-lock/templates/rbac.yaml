@@ -12,27 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Controller ClusterRole
+# Controller reconciles ZenLocks and sets OwnerReferences on Secrets
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "zen-lock.fullname" . }}
+  name: {{ include "zen-lock.fullname" . }}-controller
   labels:
     {{- include "zen-lock.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
   annotations:
-    rbac.authorization.k8s.io/justification: "Controller watches ZenLocks and updates their status. Webhook reads ZenLocks and creates ephemeral Secrets for Pods."
+    rbac.authorization.k8s.io/justification: "Controller reconciles ZenLocks and updates their status. Also sets OwnerReferences on Secrets created by webhook."
 rules:
-  # ZenLock CRD: Full access
+  # ZenLock CRD: Read and update status only
   - apiGroups: ["security.zen.io"]
     resources: ["zenlocks"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["security.zen.io"]
     resources: ["zenlocks/status"]
     verbs: ["get", "update", "patch"]
-  # Secrets: Create and read (for ephemeral secrets)
+  # Secrets: Update to set OwnerReferences (created by webhook)
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "watch", "create"]
-  # Pods: Read access (for webhook injection)
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  # Pods: Read to get UID for OwnerReference
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
@@ -45,18 +48,57 @@ rules:
     resources: ["leases"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
 ---
+# Controller ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "zen-lock.fullname" . }}
+  name: {{ include "zen-lock.fullname" . }}-controller
   labels:
     {{- include "zen-lock.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "zen-lock.fullname" . }}
+  name: {{ include "zen-lock.fullname" . }}-controller
 subjects:
   - kind: ServiceAccount
     name: {{ include "zen-lock.serviceAccountName" . }}
     namespace: {{ include "zen-lock.namespace" . }}
-
+---
+# Webhook ClusterRole
+# Webhook reads ZenLocks and creates ephemeral Secrets for Pod injection
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "zen-lock.fullname" . }}-webhook
+  labels:
+    {{- include "zen-lock.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  annotations:
+    rbac.authorization.k8s.io/justification: "Webhook reads ZenLocks and creates ephemeral Secrets for Pod injection. Also refreshes stale secrets."
+rules:
+  # ZenLock CRD: Read only (to fetch and decrypt)
+  - apiGroups: ["security.zen.io"]
+    resources: ["zenlocks"]
+    verbs: ["get"]
+  # Secrets: Create, get, update (for ephemeral secrets and stale-secret refresh)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "update"]
+---
+# Webhook ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "zen-lock.fullname" . }}-webhook
+  labels:
+    {{- include "zen-lock.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "zen-lock.fullname" . }}-webhook
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "zen-lock.serviceAccountName" . }}
+    namespace: {{ include "zen-lock.namespace" . }}

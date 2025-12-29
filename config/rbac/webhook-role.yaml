@@ -9,14 +9,10 @@ rules:
   - apiGroups: ["security.zen.io"]
     resources: ["zenlocks"]
     verbs: ["get"]
-  # Secrets: Create only (for ephemeral secrets)
+  # Secrets: Create, get, update (for ephemeral secrets and stale-secret refresh)
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["create"]
-  # Pods: Read only (for webhook injection metadata)
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get"]
+    verbs: ["create", "get", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
