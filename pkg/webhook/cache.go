@@ -130,7 +130,12 @@ func (c *ZenLockCache) cleanup() {
 
 // Stop stops the background cleanup goroutine
 func (c *ZenLockCache) Stop() {
-	close(c.stopCh)
+	select {
+	case <-c.stopCh:
+		// Already stopped, do nothing
+	default:
+		close(c.stopCh)
+	}
 }
 
 // Size returns the current cache size
