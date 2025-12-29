@@ -44,8 +44,8 @@ func setupTestPodHandler(t *testing.T) (*PodHandler, *fake.ClientBuilder) {
 	// Create handler with test private key (this is a test key, not for production)
 	privateKey := "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
 	
-	// Initialize crypto (needed for decryption)
-	encryptor := crypto.NewAgeEncryptor()
+	// Initialize crypto registry (supports multiple algorithms)
+	registry := crypto.GetGlobalRegistry()
 	
 	// Initialize cache for tests
 	cache := NewZenLockCache(5 * time.Minute)
@@ -53,7 +53,7 @@ func setupTestPodHandler(t *testing.T) (*PodHandler, *fake.ClientBuilder) {
 	handler := &PodHandler{
 		Client:     clientBuilder.Build(),
 		decoder:    admission.NewDecoder(scheme),
-		crypto:     encryptor,
+		registry:   registry,
 		privateKey: privateKey,
 		cache:      cache,
 	}

@@ -20,8 +20,8 @@ import (
 // ZenLockReconciler reconciles a ZenLock object
 type ZenLockReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	crypto crypto.Encryptor
+	Scheme  *runtime.Scheme
+	registry *crypto.Registry
 }
 
 // NewZenLockReconciler creates a new ZenLockReconciler
@@ -32,13 +32,13 @@ func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLoc
 		return nil, fmt.Errorf("ZEN_LOCK_PRIVATE_KEY environment variable is not set")
 	}
 
-	// Initialize crypto
-	encryptor := crypto.NewAgeEncryptor()
+	// Initialize crypto registry (supports multiple algorithms)
+	registry := crypto.GetGlobalRegistry()
 
 	return &ZenLockReconciler{
-		Client: client,
-		Scheme: scheme,
-		crypto: encryptor,
+		Client:   client,
+		Scheme:   scheme,
+		registry: registry,
 	}, nil
 }
 
@@ -66,12 +66,26 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
+	// Get encryptor for the algorithm specified in ZenLock (or default)
+	algorithm := zenlock.Spec.Algorithm
+	if algorithm == "" {
+		algorithm = crypto.GetDefaultAlgorithm()
+	}
+	encryptor, err := r.registry.Create(algorithm)
+	if err != nil {
+		logger.Error(err, "Unsupported algorithm", "name", zenlock.Name, "algorithm", algorithm)
+		r.updateStatus(ctx, zenlock, "Error", "UnsupportedAlgorithm", fmt.Sprintf("Unsupported algorithm: %s", algorithm))
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordReconcile(req.Namespace, req.Name, "error", duration)
+		return ctrl.Result{}, nil
+	}
+
 	// Try to decrypt to verify the secret is valid
 	decryptStart := time.Now()
-	_, err := r.crypto.DecryptMap(zenlock.Spec.EncryptedData, privateKey)
+	_, err = encryptor.DecryptMap(zenlock.Spec.EncryptedData, privateKey)
 	decryptDuration := time.Since(decryptStart).Seconds()
 	if err != nil {
-		logger.Error(err, "Failed to decrypt ZenLock", "name", zenlock.Name)
+		logger.Error(err, "Failed to decrypt ZenLock", "name", zenlock.Name, "algorithm", algorithm)
 		r.updateStatus(ctx, zenlock, "Error", "DecryptionFailed", fmt.Sprintf("Decryption failed: %v", err))
 		duration := time.Since(startTime).Seconds()
 		metrics.RecordReconcile(req.Namespace, req.Name, "error", duration)

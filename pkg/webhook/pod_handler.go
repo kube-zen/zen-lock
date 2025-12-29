@@ -67,7 +67,7 @@ func GenerateSecretName(namespace, podName string) string {
 type PodHandler struct {
 	Client     client.Client
 	decoder    admission.Decoder
-	crypto     crypto.Encryptor
+	registry   *crypto.Registry
 	privateKey string
 	cache      *ZenLockCache
 }
@@ -82,8 +82,8 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 		return nil, fmt.Errorf("ZEN_LOCK_PRIVATE_KEY environment variable is not set")
 	}
 
-	// Initialize crypto
-	encryptor := crypto.NewAgeEncryptor()
+	// Initialize crypto registry (supports multiple algorithms)
+	registry := crypto.GetGlobalRegistry()
 
 	// Initialize cache with 5 minute TTL (configurable via env in future)
 	cacheTTL := 5 * time.Minute
@@ -97,7 +97,7 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 	return &PodHandler{
 		Client:     client,
 		decoder:    decoder,
-		crypto:     encryptor,
+		registry:   registry,
 		privateKey: privateKey,
 		cache:      cache,
 	}, nil
@@ -179,9 +179,22 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		}
 	}
 
+	// Get encryptor for the algorithm specified in ZenLock (or default)
+	algorithm := zenlock.Spec.Algorithm
+	if algorithm == "" {
+		algorithm = crypto.GetDefaultAlgorithm()
+	}
+	encryptor, err := h.registry.Create(algorithm)
+	if err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
+		metrics.RecordValidationFailure(req.Namespace, "unsupported_algorithm")
+		return admission.Denied(fmt.Sprintf("unsupported algorithm %q in ZenLock %q: %v", algorithm, injectName, err))
+	}
+
 	// Decrypt data
 	decryptStart := time.Now()
-	decryptedMap, err := h.crypto.DecryptMap(zenlock.Spec.EncryptedData, h.privateKey)
+	decryptedMap, err := encryptor.DecryptMap(zenlock.Spec.EncryptedData, h.privateKey)
 	decryptDuration := time.Since(decryptStart).Seconds()
 	if err != nil {
 		duration := time.Since(startTime).Seconds()

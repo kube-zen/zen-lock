@@ -67,8 +67,23 @@ committed to version control.`,
 				encryptedData[k] = val
 			}
 
-			// Initialize decryptor
-			encryptor := crypto.NewAgeEncryptor()
+			// Get algorithm from spec (or use default)
+			algorithm := crypto.GetDefaultAlgorithm()
+			if alg, ok := spec["algorithm"].(string); ok && alg != "" {
+				algorithm = alg
+			}
+
+			// Validate algorithm is supported
+			if !crypto.IsAlgorithmSupported(algorithm) {
+				supported := crypto.GetSupportedAlgorithms()
+				return fmt.Errorf("unsupported algorithm: %s (supported: %v)", algorithm, supported)
+			}
+
+			// Create encryptor for the specified algorithm
+			encryptor, err := crypto.CreateEncryptor(algorithm)
+			if err != nil {
+				return fmt.Errorf("failed to create encryptor: %w", err)
+			}
 
 			// Decrypt
 			decrypted, err := encryptor.DecryptMap(encryptedData, string(privateKeyData))

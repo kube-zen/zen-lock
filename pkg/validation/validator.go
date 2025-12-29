@@ -20,6 +20,7 @@ package validation
 import (
 	"fmt"
 
+	"github.com/kube-zen/zen-lock/pkg/crypto"
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 )
 
@@ -33,9 +34,14 @@ func ValidateZenLock(zenlock *securityv1alpha1.ZenLock) error {
 		return fmt.Errorf("encryptedData cannot be empty")
 	}
 
-	// Validate algorithm
-	if zenlock.Spec.Algorithm != "" && zenlock.Spec.Algorithm != "age" {
-		return fmt.Errorf("unsupported algorithm: %s (only 'age' is supported)", zenlock.Spec.Algorithm)
+	// Validate algorithm using registry (supports multiple algorithms)
+	algorithm := zenlock.Spec.Algorithm
+	if algorithm == "" {
+		algorithm = crypto.GetDefaultAlgorithm()
+	}
+	if !crypto.IsAlgorithmSupported(algorithm) {
+		supported := crypto.GetSupportedAlgorithms()
+		return fmt.Errorf("unsupported algorithm: %s (supported: %v)", algorithm, supported)
 	}
 
 	// Validate encrypted data format (should be base64 strings)

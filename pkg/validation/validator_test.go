@@ -60,6 +60,18 @@ func TestValidateZenLock(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid zenlock with empty algorithm (uses default)",
+			zenlock: &securityv1alpha1.ZenLock{
+				Spec: securityv1alpha1.ZenLockSpec{
+					EncryptedData: map[string]string{
+						"key1": "encrypted-value-1",
+					},
+					Algorithm: "", // Empty should use default
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "unsupported algorithm",
 			zenlock: &securityv1alpha1.ZenLock{
 				Spec: securityv1alpha1.ZenLockSpec{

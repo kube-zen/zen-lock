@@ -14,6 +14,7 @@ func newEncryptCmd() *cobra.Command {
 	var pubkey string
 	var input string
 	var output string
+	var algorithm string
 
 	cmd := &cobra.Command{
 		Use:   "encrypt",
@@ -27,6 +28,23 @@ file with encrypted data that can be safely committed to Git.`,
 			}
 			if input == "" {
 				return fmt.Errorf("--input flag is required")
+			}
+
+			// Use default algorithm if not specified
+			if algorithm == "" {
+				algorithm = crypto.GetDefaultAlgorithm()
+			}
+
+			// Validate algorithm is supported
+			if !crypto.IsAlgorithmSupported(algorithm) {
+				supported := crypto.GetSupportedAlgorithms()
+				return fmt.Errorf("unsupported algorithm: %s (supported: %v)", algorithm, supported)
+			}
+
+			// Create encryptor for the specified algorithm
+			encryptor, err := crypto.CreateEncryptor(algorithm)
+			if err != nil {
+				return fmt.Errorf("failed to create encryptor: %w", err)
 			}
 
 			// Read input YAML
@@ -46,9 +64,6 @@ file with encrypted data that can be safely committed to Git.`,
 			if !ok {
 				return fmt.Errorf("input YAML must contain a 'stringData' field with key-value pairs")
 			}
-
-			// Initialize encryptor
-			encryptor := crypto.NewAgeEncryptor()
 
 			// Encrypt each value
 			encryptedData := make(map[string]string)
@@ -77,7 +92,7 @@ file with encrypted data that can be safely committed to Git.`,
 				},
 				"spec": map[string]interface{}{
 					"encryptedData": encryptedData,
-					"algorithm":     "age",
+					"algorithm":     algorithm,
 				},
 			}
 
@@ -111,6 +126,7 @@ file with encrypted data that can be safely committed to Git.`,
 	cmd.Flags().StringVarP(&pubkey, "pubkey", "p", "", "Public key for encryption (required)")
 	cmd.Flags().StringVarP(&input, "input", "i", "", "Input YAML file with stringData (required)")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "Output file (default: stdout)")
+	cmd.Flags().StringVarP(&algorithm, "algorithm", "a", "", fmt.Sprintf("Encryption algorithm (default: %s, supported: %v)", crypto.GetDefaultAlgorithm(), crypto.GetSupportedAlgorithms()))
 
 	return cmd
 }
