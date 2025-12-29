@@ -17,35 +17,10 @@ limitations under the License.
 package webhook
 
 import (
-	"os"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	corev1 "k8s.io/api/core/v1"
-	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 )
 
 func TestSetupWebhookWithManager(t *testing.T) {
-	// Save original value
-	originalKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ZEN_LOCK_PRIVATE_KEY", originalKey)
-		} else {
-			os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
-		}
-	}()
-
-	os.Setenv("ZEN_LOCK_PRIVATE_KEY", "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE")
-
-	scheme := runtime.NewScheme()
-	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
-
 	// Note: SetupWebhookWithManager requires a real manager with rest.Config, which requires envtest
 	// In unit tests, we can't easily create a manager without envtest setup
 	// This test verifies the function signature and that it compiles
@@ -54,22 +29,6 @@ func TestSetupWebhookWithManager(t *testing.T) {
 }
 
 func TestSetupWebhookWithManager_NoPrivateKey(t *testing.T) {
-	// Save original value
-	originalKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ZEN_LOCK_PRIVATE_KEY", originalKey)
-		} else {
-			os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
-		}
-	}()
-
-	os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
-
-	scheme := runtime.NewScheme()
-	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
-
 	// Note: SetupWebhookWithManager requires a real manager with rest.Config, which requires envtest
 	// In unit tests, we can't easily create a manager without envtest setup
 	// This test verifies the function signature and that it compiles
