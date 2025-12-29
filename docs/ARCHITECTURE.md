@@ -2,7 +2,9 @@
 
 ## Overview
 
-zen-lock implements Zero-Knowledge secret storage for Kubernetes using a mutating admission webhook and ephemeral secrets.
+zen-lock implements Zero-Knowledge secret storage for Kubernetes using an injection webhook (admission-time mutation) and ephemeral Kubernetes Secrets.
+
+**Zero-Knowledge Definition**: Zero-knowledge applies to the ZenLock CRD (ciphertext). API server/etcd cannot read the ZenLock CRD payload (ciphertext). Runtime delivery is plaintext by design (Kubernetes Secret + volume mount). Runtime delivery exposes plaintext to the workload and to any principal that can read the generated Kubernetes Secret.
 
 ## Architecture Components
 
