@@ -84,10 +84,29 @@ Before deploying:
 
 ### Zero-Knowledge Architecture
 
-- Secrets are encrypted client-side before being stored in etcd
-- The API server cannot read encrypted secrets
-- Decryption happens only in the webhook, in-memory
-- Decrypted secrets are ephemeral and tied to Pod lifecycle
+- **ZenLock CRD (Source-of-Truth)**: Secrets are encrypted client-side before being stored in etcd as ciphertext
+- **API server cannot decrypt**: The Kubernetes API server cannot read the encrypted ZenLock CRD data
+- **Runtime Decryption**: Decryption happens in the webhook process; decrypted data is persisted as a Kubernetes Secret for Pod consumption
+- **Ephemeral Secrets**: Decrypted secrets are ephemeral and tied to Pod lifecycle via OwnerReference
+
+**Important**: Zero-knowledge applies to the source-of-truth object; runtime delivery necessarily exposes plaintext to the workload and (via Kubernetes Secret) to any principal with Secret read access.
+
+### Threat Model
+
+**Cluster-Admin Access**:
+- Cluster administrators with Secret read access can view decrypted ephemeral Secrets
+- RBAC and etcd encryption-at-rest are required for defense-in-depth
+- zen-lock is not a hard security boundary against cluster-admin
+
+**Compromised Workload**:
+- A compromised workload can read its own injected secrets (mounted as files or environment variables)
+- This is expected behavior; secrets are decrypted for workload consumption
+- Use AllowedSubjects to limit which workloads can access which secrets
+
+**Webhook Availability**:
+- Webhook failures can block Pod creation (failurePolicy: Fail)
+- Webhook timeouts can delay Pod startup
+- Monitor webhook health and configure appropriate failurePolicy for your use case
 
 ### Key Management
 

@@ -26,12 +26,12 @@ The CLI is used by developers to encrypt secrets before committing them to Git.
 
 The controller runs as a Kubernetes Deployment and includes:
 - ZenLock reconciler for ZenLock CRDs
-- Secret reconciler for ephemeral Secret lifecycle
+- Secret reconciler for ephemeral Kubernetes Secret lifecycle
 - Mutating admission webhook server
 
 **Responsibilities:**
 - Reconcile ZenLock CRDs and update status
-- Set OwnerReferences on ephemeral Secrets (once Pod UID is available)
+- Set OwnerReferences on ephemeral Kubernetes Secrets (once Pod UID is available)
 - Clean up orphaned Secrets (Pods that don't exist)
 - Handle Pod admission requests
 - Inject secrets into Pods
@@ -59,7 +59,7 @@ The webhook handler intercepts Pod creation requests.
 3. Fetch ZenLock CRD
 4. Validate AllowedSubjects (if configured)
 5. Decrypt secret data
-6. Create ephemeral Secret with labels (OwnerReference set by controller)
+6. Create ephemeral Kubernetes Secret with labels (OwnerReference set by controller)
 7. If secret already exists, validate and refresh stale data
 8. Patch Pod to mount secret
 
@@ -91,15 +91,17 @@ Kubernetes Cluster:
   Git → kubectl apply → ZenLock CRD (encrypted) → etcd
   
 Pod Creation:
-  kubectl apply Pod → API Server → Webhook → Decrypt → Ephemeral Secret → Pod
+  kubectl apply Pod → API Server → Injection Webhook → Decrypt → Ephemeral Kubernetes Secret → Pod
 ```
 
 ## Security Model
 
 ### Zero-Knowledge Principles
 
-1. **At Rest (ZenLock CRD)**: Secrets stored as ciphertext in etcd. The API server cannot read the encrypted data.
-2. **At Rest (Ephemeral Secrets)**: Decrypted secrets are stored as standard Kubernetes Secrets in etcd. These are protected by:
+**Zero-knowledge applies to the source-of-truth object; runtime delivery necessarily exposes plaintext to the workload and (via Kubernetes Secret) to any principal with Secret read access.**
+
+1. **At Rest (ZenLock CRD - Source-of-Truth)**: Secrets stored as ciphertext in etcd. The API server cannot read the encrypted data.
+2. **At Rest (Ephemeral Kubernetes Secret - Runtime Plaintext)**: Decrypted secrets are stored as standard Kubernetes Secrets in etcd. These are protected by:
    - Encryption at rest (if configured for etcd)
    - RBAC controls
    - OwnerReference-based automatic cleanup
@@ -141,11 +143,11 @@ Ephemeral secrets are standard Kubernetes Secrets with:
 
 ## Webhook Configuration
 
-The mutating webhook:
+The injection webhook (admission-time mutation):
 - Intercepts Pod CREATE operations
 - Uses TLS for secure communication
 - Validates AllowedSubjects (if configured)
-- Creates ephemeral secrets atomically
+- Creates ephemeral Kubernetes Secrets atomically
 
 ## Testing
 
@@ -174,4 +176,33 @@ See [TESTING.md](TESTING.md) for details.
 - Performance optimizations
 
 See [ROADMAP.md](../ROADMAP.md) for planned features.
+
+## Trade-offs
+
+### Why Kubernetes Secret Objects?
+
+zen-lock uses standard Kubernetes Secrets for runtime injection to maintain compatibility with existing applications and Kubernetes patterns:
+
+- **Compatibility**: Works with any application that reads secrets from files or environment variables
+- **Standard Patterns**: Uses well-understood Kubernetes Secret mounting mechanisms
+- **RBAC Integration**: Leverages existing Kubernetes RBAC for access control
+- **Lifecycle Management**: Benefits from Kubernetes garbage collection via OwnerReference
+
+### Alternative Patterns
+
+For use cases where Kubernetes Secret objects are not desired, consider:
+
+- **Vault Agent Injector**: Sidecar rendering secrets to a shared volume
+  - Reference: [HashiCorp Vault Agent Injector](https://developer.hashicorp.com/vault/docs/platform/k8s/injector)
+  - Use when: You need Vault's dynamic secrets, policy engine, or audit capabilities
+
+- **Secrets Store CSI Driver**: Mount external secrets stores as volumes
+  - Reference: [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/)
+  - Use when: You need to avoid Kubernetes Secret objects or integrate with cloud secret managers
+
+- **1Password Kubernetes Operator**: Sync 1Password items into Kubernetes Secrets
+  - Reference: [1Password Kubernetes Operator](https://developer.1password.com/docs/connect/kubernetes-operator)
+  - Use when: You already use 1Password and want automated secret synchronization
+
+See [FAQ.md](FAQ.md) for decision guidance on when to use zen-lock vs alternatives.
 

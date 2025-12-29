@@ -26,14 +26,16 @@ See [ROADMAP.md](../ROADMAP.md) for complete feature plans.
 
 zen-lock implements Zero-Knowledge encryption with the following security properties:
 
-**ZenLock CRD (Source of Truth)**:
+**Zero-knowledge applies to the source-of-truth object; runtime delivery necessarily exposes plaintext to the workload and (via Kubernetes Secret) to any principal with Secret read access.**
+
+**ZenLock CRD (Source-of-Truth Ciphertext)**:
 - Stored in etcd as unreadable ciphertext
 - API server cannot decrypt the data
 - Safe to commit to Git
 - Encrypted client-side before reaching the cluster
 
-**Ephemeral Secrets (Runtime)**:
-- Created by webhook as standard Kubernetes Secrets
+**Ephemeral Kubernetes Secret (Runtime Plaintext)**:
+- Created by injection webhook (admission-time mutation) as standard Kubernetes Secrets
 - Stored in etcd (protected by encryption at rest if configured)
 - Contain decrypted plaintext data
 - Short-lived (only exist during Pod lifetime)
@@ -127,12 +129,38 @@ data:
 
 ### External Secrets Management
 
-**Recommended for production:**
+zen-lock integrates with external secret managers for key custody and authoring-time workflows. See [INTEGRATIONS.md](INTEGRATIONS.md) for detailed integration strategies.
 
-- **AWS KMS**: Store keys in AWS KMS (v0.2.0)
-- **Google Cloud KMS**: Use GCP KMS (v0.2.0)
-- **Azure Key Vault**: Use Azure Key Vault (v0.2.0)
-- **HashiCorp Vault**: Integrate with Vault
+**Key Custody** (v0.2.0):
+- **AWS KMS**: Store zen-lock private key in AWS KMS
+- **Google Cloud KMS**: Store zen-lock private key in GCP KMS
+- **Azure Key Vault**: Store zen-lock private key in Azure Key Vault
+- **HashiCorp Vault**: Store zen-lock private key in Vault (use Vault Agent for injection)
+
+**Authoring-Time Integration**:
+- Fetch secrets from external systems during development/CI
+- Encrypt with zen-lock CLI
+- Commit encrypted ZenLock CRD to Git
+- No runtime dependency on external systems
+
+**Runtime Injection Alternatives**:
+- **Vault Agent Injector**: For dynamic secrets and centralized policy
+  - Reference: [HashiCorp Vault Agent Injector](https://developer.hashicorp.com/vault/docs/platform/k8s/injector)
+  - Use when: You need Vault's dynamic secrets, policy engine, or audit capabilities
+
+- **1Password Kubernetes Operator**: For automated secret synchronization
+  - Reference: [1Password Kubernetes Operator](https://developer.1password.com/docs/connect/kubernetes-operator)
+  - Use when: You already use 1Password and want automated secret synchronization
+
+**Vault Licensing Note**:
+
+HashiCorp Vault is source-available under Business Source License 1.1 (BUSL/BSL) with a defined change license to MPL 2.0 at the change date.
+
+**References**:
+- [HashiCorp Vault License](https://github.com/hashicorp/vault/blob/main/LICENSE)
+- [HashiCorp Licensing FAQ](https://www.hashicorp.com/license-faq)
+
+**Important**: zen-lock does not embed or redistribute Vault; any integration should be reviewed for compliance in your environment (not legal advice).
 
 ### Environment Variables
 

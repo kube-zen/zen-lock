@@ -4,7 +4,7 @@ A Helm chart for deploying zen-lock, a Zero-Knowledge secret manager for Kuberne
 
 ## Introduction
 
-zen-lock provides Zero-Knowledge secret management for Kubernetes, ensuring secrets are never stored in plaintext in etcd and never visible via kubectl. Secrets are encrypted at rest and only decrypted in Pod memory.
+zen-lock provides Zero-Knowledge secret management for Kubernetes. The source-of-truth (ZenLock CRD) is encrypted and stored as ciphertext in etcd. Runtime injection uses short-lived Kubernetes Secrets that contain decrypted data; RBAC and etcd encryption-at-rest are required for defense-in-depth.
 
 ## Prerequisites
 
@@ -207,12 +207,23 @@ kubectl delete crd zenlocks.security.kube-zen.io
    ```
    Should start with `AGE-SECRET-1`
 
+## Limitations
+
+zen-lock is designed for static secrets in GitOps workflows. For dynamic secrets, centralized policy, or avoiding Kubernetes Secret objects, consider alternatives:
+
+- **Vault Agent Injector**: For dynamic secrets and centralized policy
+- **Secrets Store CSI Driver**: For mounting external secret stores
+- **1Password Kubernetes Operator**: For automated secret synchronization
+
+See [docs/FAQ.md](../../docs/FAQ.md) for detailed positioning and [docs/INTEGRATIONS.md](../../docs/INTEGRATIONS.md) for integration strategies.
+
 ## Security Considerations
 
 - **Private Key**: Store the private key securely. Consider using a secret management system like Vault or AWS Secrets Manager.
 - **RBAC**: The chart creates ClusterRole/ClusterRoleBinding with minimal required permissions.
 - **TLS**: Use cert-manager for production TLS certificate management.
 - **Network Policies**: Consider adding NetworkPolicies to restrict webhook access.
+- **Ephemeral Secrets**: Ephemeral Secrets are standard Kubernetes Secrets and can be read by principals with Secret read access; treat RBAC/etcd encryption as mandatory controls.
 
 ## Chart Repository
 

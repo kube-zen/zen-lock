@@ -313,6 +313,29 @@ If the secret isn't appearing in the Pod:
 3. **Check Pod events**: Look for webhook-related events
 4. **Verify namespace**: Ensure ZenLock exists in the same namespace as the Pod
 
+## Choosing zen-lock vs Alternatives
+
+zen-lock is designed for **static secrets in GitOps workflows**. Use this decision tree:
+
+**Use zen-lock when**:
+- ✅ Static secrets + GitOps is the goal
+- ✅ You want encrypted manifests in version control
+- ✅ Simple, declarative secret injection is sufficient
+- ✅ You prefer Kubernetes-native patterns (CRDs, webhooks)
+
+**Use alternatives when**:
+- ❌ You need dynamic secrets or credential rotation (use Vault Agent Injector)
+- ❌ You want to avoid Kubernetes Secret objects (use Secrets Store CSI Driver)
+- ❌ Centralized policy and audit are required (use Vault)
+- ❌ You need integration with external secret providers at runtime (use Vault/CSI/1Password Operator)
+
+**Alternatives**:
+- **Vault Agent Injector**: [HashiCorp Vault Agent Injector](https://developer.hashicorp.com/vault/docs/platform/k8s/injector)
+- **Secrets Store CSI Driver**: [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/)
+- **1Password Kubernetes Operator**: [1Password Kubernetes Operator](https://developer.1password.com/docs/connect/kubernetes-operator)
+
+See [FAQ.md](FAQ.md) for detailed positioning and [INTEGRATIONS.md](INTEGRATIONS.md) for integration strategies.
+
 ## Best Practices
 
 ### Key Management

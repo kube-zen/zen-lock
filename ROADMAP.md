@@ -59,9 +59,40 @@ This document outlines the planned features and improvements for zen-lock.
 - Batch operations
 - Performance optimizations
 
+## Integration Strategy
+
+zen-lock's integration model focuses on authoring-time and key custody, not runtime secret fetching.
+
+### Phase 1: Authoring-Time Providers (v0.2.0)
+
+- Vault CLI integration helpers
+- 1Password CLI integration helpers
+- Generic provider abstraction for custom integrations
+
+**Pattern**: Pull from provider → encrypt → commit ZenLock CRD (no runtime dependency)
+
+### Phase 2: Key Custody Providers (v0.2.0)
+
+- Vault key injection via Vault Agent
+- 1Password key injection via 1Password Operator
+- AWS KMS, GCP KMS, Azure Key Vault integration
+- Generic Kubernetes Secret provider interface
+
+**Pattern**: Store zen-lock private key in external system; fetch at startup (policy-driven)
+
+### Phase 3: Optional Enhancements (v1.0.0+)
+
+- CSI driver alignment (avoid Kubernetes Secret objects)
+- Direct volume mounting of encrypted data
+- **Note**: Not promised unless explicitly committed to roadmap
+
+**Non-Goal**: Runtime "fetch from provider during admission" (availability/latency blast radius).
+
+See [INTEGRATIONS.md](docs/INTEGRATIONS.md) for detailed integration strategies.
+
 ## Long-Term Vision
 
-- Integration with external secret managers
+- Integration with external secret managers (authoring-time and key custody)
 - Support for additional encryption algorithms
 - Kubernetes-native key management
 - Operator for automated management

@@ -13,6 +13,30 @@ zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge se
 - **Comprehensive Testing**: Full integration and E2E test coverage.
 - **Production-Ready Operations**: High availability, leader election, comprehensive observability (metrics, alerts, dashboards), least-privilege RBAC, orphan cleanup, stale-secret prevention.
 
+## Scope and Non-Goals
+
+zen-lock is **not**:
+- A centralized secrets platform (no auth methods, policy engine, audit devices)
+- Dynamic secrets/leased credentials (DB/cloud rotations)
+- A general "sync secrets from external providers" operator
+- A hard security boundary against cluster-admin (RBAC/etcd encryption required)
+
+**Use zen-lock when**: Static secrets + GitOps is the goal.  
+**Use alternatives when**: You need dynamic secrets, centralized policy, or to avoid Kubernetes Secret objects.
+
+See [FAQ](docs/FAQ.md) for detailed positioning and [INTEGRATIONS.md](docs/INTEGRATIONS.md) for integration strategies.
+
+## Integrations
+
+zen-lock supports integration with external secret managers through two modes:
+
+1. **Authoring-Time**: Pull from provider → encrypt → commit ZenLock CRD (no runtime dependency)
+2. **Key Custody**: Store zen-lock private key in external system; fetch at startup (policy-driven)
+
+**Non-Goal**: Runtime "fetch from provider during admission" (availability/latency blast radius).
+
+See [INTEGRATIONS.md](docs/INTEGRATIONS.md) for detailed integration strategies with Vault, 1Password, and other providers.
+
 ## Quick Start
 
 ### 1. Generate Keys
@@ -264,7 +288,7 @@ zen-lock implements Zero-Knowledge encryption with the following security proper
 - **In Memory**: The decrypted value exists as a standard Kubernetes Secret mounted into the Pod.
 - **Auto-Cleanup**: By setting the OwnerReference of the decrypted secret to the Pod, Kubernetes guarantees that the secret is deleted when the Pod is removed.
 
-**Important**: The source-of-truth (ZenLock CRD) is encrypted and never stored in plaintext. However, ephemeral Secrets created by the webhook are standard Kubernetes Secrets containing decrypted data. Enable etcd encryption at rest for additional protection of ephemeral Secrets.
+**Important**: The source-of-truth (ZenLock CRD) is encrypted and never stored in plaintext. However, ephemeral Secrets created by the webhook are standard Kubernetes Secrets containing decrypted data. **Ephemeral Secrets are standard Kubernetes Secrets and can be read by principals with Secret read access; treat RBAC/etcd encryption as mandatory controls.** Enable etcd encryption at rest for additional protection of ephemeral Secrets.
 
 ## Documentation
 

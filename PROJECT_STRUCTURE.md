@@ -2,7 +2,7 @@
 
 ## Overview
 
-zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge secret storage. It ensures your secrets are never stored in plaintext in etcd and never visible via kubectl.
+zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge secret storage. ZenLock CRD is ciphertext in etcd; runtime injection uses short-lived Kubernetes Secrets subject to RBAC and (recommended) etcd encryption-at-rest.
 
 ## Project Goals
 
@@ -168,11 +168,13 @@ zen-lock/
 
 ### Key Principles
 
-- ✅ Secrets never stored in plaintext
+- ✅ Source-of-truth never stored in plaintext (runtime Secret is plaintext by design)
 - ✅ Ephemeral secrets with automatic cleanup
 - ✅ Client-side encryption
 - ✅ Kubernetes-native patterns
 - ✅ No external dependencies
+
+**Limitations / Non-goals**: See [docs/FAQ.md](docs/FAQ.md) for positioning, limitations, and non-goals.
 
 ## Version
 
