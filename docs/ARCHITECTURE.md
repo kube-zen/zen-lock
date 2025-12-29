@@ -74,13 +74,25 @@ The webhook handler intercepts Pod creation requests.
 
 ### 4. Crypto Library (`pkg/crypto`)
 
-Provides encryption/decryption abstraction.
+Provides encryption/decryption abstraction with cryptographic agility through an algorithm registry.
 
 **Current Implementation:**
 - Age encryption (X25519)
+- Algorithm registry (factory pattern for multiple algorithms)
+- Thread-safe algorithm registration
+- Default algorithm handling
+- Per-ZenLock algorithm selection
+
+**Algorithm Registry**:
+- Maps algorithm names to factory functions
+- Supports dynamic algorithm registration
+- Thread-safe with mutex protection
+- Backward compatible (empty algorithm defaults to "age")
+- Clear error messages listing supported algorithms
 
 **Future:**
-- Support for multiple encryption backends
+- Support for additional encryption backends (AES256-GCM, etc.)
+- Algorithm migration utilities
 - KMS integration
 
 ## Data Flow
