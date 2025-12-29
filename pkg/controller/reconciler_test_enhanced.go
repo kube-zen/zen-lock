@@ -32,6 +32,9 @@ import (
 
 func TestZenLockReconciler_Reconcile_NoPrivateKey(t *testing.T) {
 	reconciler, clientBuilder := setupTestReconciler(t)
+	if reconciler == nil {
+		t.Fatal("setupTestReconciler returned nil reconciler")
+	}
 
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
@@ -87,6 +90,9 @@ func TestZenLockReconciler_Reconcile_NoPrivateKey(t *testing.T) {
 
 func TestZenLockReconciler_Reconcile_DecryptionFailed(t *testing.T) {
 	reconciler, clientBuilder := setupTestReconciler(t)
+	if reconciler == nil {
+		t.Fatal("setupTestReconciler returned nil reconciler")
+	}
 
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
