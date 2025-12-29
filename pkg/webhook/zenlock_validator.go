@@ -86,13 +86,9 @@ func (h *ZenLockValidatorHandler) Handle(ctx context.Context, req admission.Requ
 	case admissionv1.Create:
 		err = h.validator.validateZenLock(zenlock)
 	case admissionv1.Update:
-		oldZenLock := &securityv1alpha1.ZenLock{}
-		if err := h.decoder.DecodeRaw(req.OldObject, oldZenLock); err == nil {
-			// Validate the new object
-			err = h.validator.validateZenLock(zenlock)
-		} else {
-			err = h.validator.validateZenLock(zenlock)
-		}
+		// Validate the new object (old object decoding is optional)
+		_ = h.decoder.DecodeRaw(req.OldObject, &securityv1alpha1.ZenLock{})
+		err = h.validator.validateZenLock(zenlock)
 	case admissionv1.Delete:
 		// Allow deletion - finalizers handle cleanup
 		return admission.Allowed("")

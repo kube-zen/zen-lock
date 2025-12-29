@@ -163,7 +163,7 @@ func (rl *RateLimiter) RateLimitMiddleware(next func(http.ResponseWriter, *http.
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded","code":"RATE_LIMITED"}`))
+			_, _ = w.Write([]byte(`{"error":"rate limit exceeded","code":"RATE_LIMITED"}`))
 			return
 		}
 		next(w, r)
