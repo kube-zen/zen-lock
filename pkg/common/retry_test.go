@@ -223,11 +223,10 @@ func TestRetry_ConfigDefaults(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	if config.MaxAttempts == 0 {
-		t.Error("Expected MaxAttempts to be set to default")
-	}
-	if config.InitialDelay == 0 {
-		t.Error("Expected InitialDelay to be set to default")
+	// Note: Retry doesn't modify the original config, it works with a copy internally
+	// The test verifies that Retry works correctly with empty config (uses defaults internally)
+	if attempts != 2 {
+		t.Errorf("Expected 2 attempts, got %d", attempts)
 	}
 }
 
