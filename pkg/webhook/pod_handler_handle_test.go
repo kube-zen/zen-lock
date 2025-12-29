@@ -92,7 +92,7 @@ func TestPodHandler_Handle_InvalidMountPath(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject:  "test-zenlock",
+				annotationInject:    "test-zenlock",
 				annotationMountPath: "/etc/", // Invalid mount path
 			},
 		},
@@ -312,4 +312,3 @@ func TestPodHandler_Handle_CacheHit(t *testing.T) {
 	// Error is expected due to invalid ciphertext, but cache path was executed
 	_ = resp.Result
 }
-

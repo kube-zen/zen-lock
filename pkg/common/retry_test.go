@@ -319,4 +319,3 @@ func TestRetryWithResult_ContextCancellation(t *testing.T) {
 		t.Errorf("Expected zero value for result, got %q", result)
 	}
 }
-

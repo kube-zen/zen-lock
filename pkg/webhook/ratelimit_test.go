@@ -271,4 +271,3 @@ func TestRateLimitMiddleware_RateLimited(t *testing.T) {
 		t.Errorf("Expected Retry-After header, got %q", w2.Header().Get("Retry-After"))
 	}
 }
-

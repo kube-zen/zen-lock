@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"filippo.io/age"
-	corev1 "k8s.io/api/core/v1"
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func setupTestValidator(t *testing.T) (*ZenLockValidatorHandler, *runtime.Scheme) {
@@ -73,8 +73,8 @@ func createTestZenLock(t *testing.T, encryptedData map[string]string, algorithm 
 			Namespace: "default",
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
-			EncryptedData:  encryptedData,
-			Algorithm:      algorithm,
+			EncryptedData:   encryptedData,
+			Algorithm:       algorithm,
 			AllowedSubjects: allowedSubjects,
 		},
 	}
@@ -520,4 +520,3 @@ func TestZenLockValidatorHandler_Handle_InvalidJSON(t *testing.T) {
 		t.Errorf("Expected 400 status code, got: %v", resp.Result)
 	}
 }
-

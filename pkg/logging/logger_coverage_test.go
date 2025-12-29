@@ -199,4 +199,3 @@ func TestWithContext_Coverage(t *testing.T) {
 		t.Error("FromContext should return the same logger instance")
 	}
 }
-

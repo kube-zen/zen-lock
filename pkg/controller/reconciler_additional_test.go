@@ -69,4 +69,3 @@ func TestZenLockReconciler_Reconcile_FinalizerAdditionError(t *testing.T) {
 
 // Note: TestZenLockReconciler_Reconcile_NoPrivateKey and TestZenLockReconciler_Reconcile_DecryptionFailed
 // are already defined in reconciler_test_enhanced.go
-

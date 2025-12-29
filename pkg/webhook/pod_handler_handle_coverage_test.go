@@ -305,4 +305,3 @@ func TestPodHandler_Handle_DefaultMountPath(t *testing.T) {
 		t.Errorf("Expected request to be allowed with default mount path, got: %v", resp.Result)
 	}
 }
-

@@ -331,4 +331,3 @@ func TestNewSecretReconciler_WithInvalidTTL(t *testing.T) {
 		t.Errorf("Expected OrphanTTL to be default %v, got %v", expectedTTL, reconciler.OrphanTTL)
 	}
 }
-

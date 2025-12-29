@@ -69,4 +69,3 @@ func TestRateLimiter_Cleanup_Stop(t *testing.T) {
 		t.Error("Expected stopCh to be closed after Stop()")
 	}
 }
-

@@ -217,4 +217,3 @@ func TestPodHandler_Handle_SecretCreateError(t *testing.T) {
 	// Error is expected due to invalid ciphertext, but secret creation path was executed
 	_ = resp.Result
 }
-

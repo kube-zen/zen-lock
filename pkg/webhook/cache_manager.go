@@ -68,4 +68,3 @@ func InvalidateAll() {
 		cache.InvalidateAll()
 	}
 }
-
