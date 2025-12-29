@@ -42,6 +42,12 @@ The controller runs as a Kubernetes Deployment and includes:
 - Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount
 - This single-SA model is consistent across Helm chart and config manifests
 
+**Performance Optimizations:**
+- **ZenLock Caching**: Webhook caches ZenLock CRDs (5min TTL, configurable) to reduce API server load
+- **Private Key Caching**: Private key loaded once at startup, cached in handler
+- **Input Validation**: Comprehensive validation of annotations and mount paths prevents invalid requests
+- **Error Sanitization**: Error messages sanitized to prevent information leakage
+
 ### 3. Webhook Handler (`pkg/webhook`)
 
 The webhook handler intercepts Pod creation requests.
