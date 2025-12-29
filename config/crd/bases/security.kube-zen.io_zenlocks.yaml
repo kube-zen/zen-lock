@@ -17,15 +17,15 @@ spec:
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
-    - jsonPath: .status.phase
-      name: Phase
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1alpha1
-    schema:
-      openAPIV3Schema:
+        - jsonPath: .status.phase
+          name: Phase
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
         description: ZenLock is the Schema for the zenlocks API
         properties:
           apiVersion:
@@ -53,7 +53,7 @@ spec:
                 description: 'Algorithm specifies the encryption method (default:
                   "age")'
                 enum:
-                - age
+                  - age
                 type: string
               allowedSubjects:
                 description: |-
@@ -61,14 +61,15 @@ spec:
                   Currently only ServiceAccount kind is supported. User and Group kinds are not yet implemented.
                 items:
                   description: |-
-                    SubjectReference references a Kubernetes subject
-                    Currently only ServiceAccount kind is supported. User and Group kinds are planned for future releases.
+                    SubjectReference references a Kubernetes subject.
+                    Currently only ServiceAccount kind is supported.
+                    User and Group kinds are planned for future releases.
                   properties:
                     kind:
                       description: Kind is the kind of subject. Currently only "ServiceAccount"
                         is supported.
                       enum:
-                      - ServiceAccount
+                        - ServiceAccount
                       type: string
                     name:
                       description: Name is the name of the subject
@@ -78,8 +79,8 @@ spec:
                         for ServiceAccount)
                       type: string
                   required:
-                  - kind
-                  - name
+                    - kind
+                    - name
                   type: object
                 type: array
               encryptedData:
@@ -88,7 +89,7 @@ spec:
                 description: EncryptedData is a map of key -> Base64-encoded ciphertext
                 type: object
             required:
-            - encryptedData
+              - encryptedData
             type: object
           status:
             description: ZenLockStatus defines the observed state of ZenLock
@@ -119,8 +120,8 @@ spec:
                       description: Type of condition
                       type: string
                   required:
-                  - status
-                  - type
+                    - status
+                    - type
                   type: object
                 type: array
               lastRotation:
@@ -130,8 +131,8 @@ spec:
               phase:
                 description: Phase represents the current phase of the ZenLock
                 enum:
-                - Ready
-                - Error
+                  - Ready
+                  - Error
                 type: string
             type: object
         type: object
