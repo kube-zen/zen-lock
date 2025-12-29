@@ -350,6 +350,8 @@ func TestWebhook_StaleSecretRefresh_Integration(t *testing.T) {
 		t.Fatalf("Failed to create PodHandler: %v", err)
 	}
 
+	ctx := context.Background()
+
 	// Simulate webhook admission request
 	podRaw, _ := json.Marshal(pod)
 	req := admission.Request{
@@ -359,7 +361,6 @@ func TestWebhook_StaleSecretRefresh_Integration(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
 	resp := handler.Handle(ctx, req)
 
 	if !resp.Allowed {
