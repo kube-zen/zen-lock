@@ -104,4 +104,3 @@ webhooks:
     namespaceSelector:
       matchLabels:
         zen-lock: enabled
-

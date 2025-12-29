@@ -9,9 +9,9 @@ spec:
     name: zen-lock-selfsigned-issuer
     kind: Issuer
   dnsNames:
-  - zen-lock-webhook
-  - zen-lock-webhook.zen-lock-system
-  - zen-lock-webhook.zen-lock-system.svc
+    - zen-lock-webhook
+    - zen-lock-webhook.zen-lock-system
+    - zen-lock-webhook.zen-lock-system.svc
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -20,4 +20,3 @@ metadata:
   namespace: zen-lock-system
 spec:
   selfSigned: {}
-
