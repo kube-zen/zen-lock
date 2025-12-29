@@ -18,7 +18,8 @@ func main() {
 		Use:   "zen-lock",
 		Short: "zen-lock - Zero-Knowledge secret manager for Kubernetes",
 		Long: `zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge secret storage.
-The source-of-truth (ZenLock CRD) is encrypted and stored as ciphertext in etcd. Runtime injection uses short-lived Kubernetes Secrets that contain decrypted data; RBAC and etcd encryption-at-rest are required for defense-in-depth.`,
+
+ZenLock CRDs store only ciphertext (source-of-truth). During Pod injection, zen-lock decrypts in the webhook and creates an ephemeral Kubernetes Secret containing plaintext, which is mounted into the Pod. Protect ephemeral Secrets via RBAC and etcd encryption-at-rest.`,
 		Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, buildDate),
 	}
 

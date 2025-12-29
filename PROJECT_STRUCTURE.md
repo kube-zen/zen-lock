@@ -6,8 +6,8 @@ zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge se
 
 ## Project Goals
 
-1. **Zero-Knowledge**: Secrets are ciphertext in etcd. The API server cannot read them.
-2. **Ephemeral Lifecycle**: Decrypted secrets exist only for the lifetime of the Pod.
+1. **Zero-Knowledge**: ZenLock CRDs store only ciphertext (source-of-truth). API server/etcd cannot read the ZenLock CRD payload (ciphertext). Zero-knowledge applies to the ZenLock CRD (ciphertext). Runtime delivery exposes plaintext to the workload and to any principal that can read the generated Kubernetes Secret.
+2. **Ephemeral Lifecycle**: Decrypted secrets are stored in an ephemeral Kubernetes Secret for Pod consumption and are cleaned up when Pods terminate (plus orphan TTL cleanup).
 3. **GitOps Ready**: Encrypted manifests can be safely committed to Git.
 4. **Kubernetes-Native**: Uses standard CRDs and Mutating Webhooks. No external databases.
 
@@ -166,15 +166,17 @@ zen-lock/
 
 **Zero-Knowledge First**: zen-lock prioritizes security and zero-knowledge principles above all else.
 
+**Zero-Knowledge Definition**: Zero-knowledge applies to the ZenLock CRD (ciphertext). API server/etcd cannot read the ZenLock CRD payload (ciphertext). Runtime delivery is plaintext by design (Kubernetes Secret + volume mount). Runtime delivery exposes plaintext to the workload and to any principal that can read the generated Kubernetes Secret.
+
 ### Key Principles
 
-- ✅ Source-of-truth never stored in plaintext (runtime Secret is plaintext by design)
-- ✅ Ephemeral secrets with automatic cleanup
+- ✅ Source-of-truth (ZenLock CRD) never stored in plaintext (runtime Secret is plaintext by design)
+- ✅ Ephemeral Kubernetes Secrets with automatic cleanup
 - ✅ Client-side encryption
 - ✅ Kubernetes-native patterns
 - ✅ No external dependencies
 
-**Limitations / Non-goals**: See [docs/FAQ.md](docs/FAQ.md) for positioning, limitations, and non-goals.
+**Limitations / Non-goals**: See [docs/FAQ.md](docs/FAQ.md) for positioning, limitations, and non-goals. See [SECURITY.md](SECURITY.md#known-security-gaps--trade-offs) for known security gaps and trade-offs.
 
 ## Version
 

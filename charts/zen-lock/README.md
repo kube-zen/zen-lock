@@ -2,9 +2,13 @@
 
 A Helm chart for deploying zen-lock, a Zero-Knowledge secret manager for Kubernetes.
 
+**Zero-Knowledge Definition**: Zero-knowledge applies to the ZenLock CRD (ciphertext). API server/etcd cannot read the ZenLock CRD payload (ciphertext). Runtime delivery is plaintext by design (Kubernetes Secret + volume mount). Runtime delivery exposes plaintext to the workload and to any principal that can read the generated Kubernetes Secret.
+
 ## Introduction
 
-zen-lock provides Zero-Knowledge secret management for Kubernetes. The source-of-truth (ZenLock CRD) is encrypted and stored as ciphertext in etcd. Runtime injection uses short-lived Kubernetes Secrets that contain decrypted data; RBAC and etcd encryption-at-rest are required for defense-in-depth.
+zen-lock provides Zero-Knowledge secret management for Kubernetes.
+
+ZenLock CRDs store only ciphertext (source-of-truth). During Pod injection, zen-lock decrypts in the webhook and creates an ephemeral Kubernetes Secret containing plaintext, which is mounted into the Pod. Protect ephemeral Secrets via RBAC and etcd encryption-at-rest.
 
 ## Prerequisites
 

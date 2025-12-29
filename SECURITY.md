@@ -122,6 +122,57 @@ Before deploying:
 - Network policies should restrict access to webhook
 - Webhook should validate AllowedSubjects
 
+## Known Security Gaps / Trade-offs
+
+This section explicitly documents security trade-offs and limitations of zen-lock.
+
+### Plaintext in etcd (Ephemeral Secrets)
+
+**Risk**: The injected ephemeral Kubernetes Secret is a normal Kubernetes Secret (plaintext in etcd unless encryption-at-rest is enabled).
+
+**Mitigation**: Enable etcd encryption-at-rest for defense-in-depth. This is a recommended but not mandatory control.
+
+**Impact**: Cluster administrators or anyone with etcd access can read decrypted secrets if etcd encryption-at-rest is not enabled.
+
+### RBAC Exposure
+
+**Risk**: Any principal with `get`/`list`/`watch` secrets in the namespace can read decrypted data from ephemeral Kubernetes Secrets.
+
+**Mitigation**: Use least-privilege RBAC. Restrict Secret read access to only necessary principals. Use AllowedSubjects to limit which workloads can access which secrets.
+
+**Impact**: Overly permissive RBAC can expose secrets to unauthorized principals.
+
+### Cluster-Admin Reality
+
+**Risk**: Cluster administrators (or anyone with etcd access) can access secrets; zen-lock is not a boundary against that threat model.
+
+**Mitigation**: This is a fundamental limitation of Kubernetes. Use separate clusters, network policies, and audit logging to detect unauthorized access.
+
+**Impact**: zen-lock cannot protect against cluster-admin or etcd access. This is expected behavior for Kubernetes-native secret management.
+
+### Webhook Key Custody Risk
+
+**Risk**: Webhook/controller holds the private key; compromise enables decrypting all ZenLocks.
+
+**Mitigation**: 
+- Store private key in external KMS (v0.2.0)
+- Use separate ServiceAccounts with least-privilege RBAC
+- Enable audit logging
+- Rotate keys regularly
+
+**Impact**: Compromise of the webhook/controller ServiceAccount allows decryption of all ZenLocks in the cluster.
+
+### Lifecycle Gaps
+
+**Risk**: Ephemeral Kubernetes Secrets exist without OwnerReferences until the controller reconciles; orphan cleanup is best-effort and TTL-based.
+
+**Mitigation**:
+- Controller sets OwnerReference once Pod UID is available
+- Orphan cleanup runs with configurable TTL (default: 15 minutes)
+- Monitor orphan cleanup metrics
+
+**Impact**: Brief window where Secrets exist without OwnerReference. Orphaned Secrets may persist if controller is unavailable.
+
 ## Security Contact
 
 - **Email**: security@kube-zen.io
