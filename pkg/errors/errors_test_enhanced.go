@@ -47,7 +47,7 @@ func TestWithPod_WithNilError(t *testing.T) {
 	// This tests the error.As path when err is nil
 	var nilErr error
 	err := WithPod(nilErr, "namespace", "name")
-	
+
 	// Should still create an error with Pod context
 	if err.PodNamespace != "namespace" {
 		t.Errorf("PodNamespace = %v, want namespace", err.PodNamespace)
@@ -56,4 +56,3 @@ func TestWithPod_WithNilError(t *testing.T) {
 		t.Errorf("PodName = %v, want name", err.PodName)
 	}
 }
-

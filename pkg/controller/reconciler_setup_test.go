@@ -57,4 +57,3 @@ func TestZenLockReconciler_SetupWithManager(t *testing.T) {
 	// Real integration tests should cover SetupWithManager functionality
 	t.Skip("SetupWithManager requires envtest - covered in integration tests")
 }
-

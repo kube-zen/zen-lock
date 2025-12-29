@@ -98,7 +98,6 @@ func TestLogger_Errorf(t *testing.T) {
 	logger.Errorf(testErr, "test error message: %s", "formatted")
 }
 
-
 func TestLogger_WithError_WithZenLockError(t *testing.T) {
 	logger := NewLogger()
 	zlerr := zlerrors.New("decryption_failed", "decryption failed")
@@ -125,4 +124,3 @@ func TestLogger_WithError_WithZenLockError(t *testing.T) {
 		t.Errorf("Expected pod_name to be 'pod-name', got %v", loggerWithErr.fields["pod_name"])
 	}
 }
-

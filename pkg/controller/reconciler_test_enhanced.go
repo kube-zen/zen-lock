@@ -135,4 +135,3 @@ func TestZenLockReconciler_Reconcile_DecryptionFailed(t *testing.T) {
 		t.Errorf("Expected phase to be Error, got: %s", updatedZenLock.Status.Phase)
 	}
 }
-
