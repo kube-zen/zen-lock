@@ -119,7 +119,7 @@ func TestPodHandler_Handle_InvalidMountPath(t *testing.T) {
 	}
 }
 
-func TestPodHandler_Handle_ZenLockNotFound(t *testing.T) {
+func TestPodHandler_Handle_ZenLockNotFound_New(t *testing.T) {
 	handler, _ := setupTestPodHandler(t)
 
 	pod := &corev1.Pod{
