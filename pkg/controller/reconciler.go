@@ -229,8 +229,16 @@ func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv
 		zenlock.Status.Conditions = append(zenlock.Status.Conditions, condition)
 	}
 
-	if err := r.Status().Update(ctx, zenlock); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to update ZenLock status")
+	// Retry status update with exponential backoff for transient errors
+	retryConfig := common.DefaultRetryConfig()
+	retryConfig.MaxAttempts = 3
+	retryConfig.InitialDelay = 100 * time.Millisecond
+	retryConfig.MaxDelay = 2 * time.Second
+
+	if err := common.Retry(ctx, retryConfig, func() error {
+		return r.Status().Update(ctx, zenlock)
+	}); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to update ZenLock status after retries")
 	}
 }
 

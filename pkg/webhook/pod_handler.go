@@ -246,13 +246,23 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		Data: secretData,
 	}
 
-	// Create the secret
-	if err := h.Client.Create(ctx, secret); err != nil {
+	// Create the secret with retry logic for transient errors
+	retryConfig := common.DefaultRetryConfig()
+	retryConfig.MaxAttempts = 3
+	retryConfig.InitialDelay = 50 * time.Millisecond
+	retryConfig.MaxDelay = 1 * time.Second
+
+	createErr := common.Retry(ctx, retryConfig, func() error {
+		return h.Client.Create(ctx, secret)
+	})
+	if createErr != nil {
 		// If secret already exists, validate it's not stale
-		if k8serrors.IsAlreadyExists(err) {
-			// Fetch existing secret to validate it matches current ZenLock data
+		if k8serrors.IsAlreadyExists(createErr) {
+			// Fetch existing secret to validate it matches current ZenLock data (with retry)
 			existingSecret := &corev1.Secret{}
-			if err := h.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: req.Namespace}, existingSecret); err != nil {
+			if err := common.Retry(ctx, retryConfig, func() error {
+				return h.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: req.Namespace}, existingSecret)
+			}); err != nil {
 				duration := time.Since(startTime).Seconds()
 				metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
 				sanitizedErr := SanitizeError(err, "fetch existing secret")
@@ -274,10 +284,15 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 					existingSecret.Labels[common.LabelZenLockName] = injectName
 					existingSecret.Labels[common.LabelPodName] = pod.Name
 					existingSecret.Labels[common.LabelPodNamespace] = req.Namespace
-					if err := h.Client.Update(ctx, existingSecret); err != nil {
+					
+					// Retry update with exponential backoff for conflict/transient errors
+					updateErr := common.Retry(ctx, retryConfig, func() error {
+						return h.Client.Update(ctx, existingSecret)
+					})
+					if updateErr != nil {
 						duration := time.Since(startTime).Seconds()
 						metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-						sanitizedErr := SanitizeError(err, "update stale secret")
+						sanitizedErr := SanitizeError(updateErr, "update stale secret")
 						return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 					}
 				}
@@ -298,20 +313,25 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 				if !dataMatches {
 					// Data doesn't match - update secret with fresh data
 					existingSecret.Data = secretData
-					if err := h.Client.Update(ctx, existingSecret); err != nil {
+					
+					// Retry update with exponential backoff for conflict/transient errors
+					updateErr := common.Retry(ctx, retryConfig, func() error {
+						return h.Client.Update(ctx, existingSecret)
+					})
+					if updateErr != nil {
 						duration := time.Since(startTime).Seconds()
 						metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-						sanitizedErr := SanitizeError(err, "refresh secret data")
+						sanitizedErr := SanitizeError(updateErr, "refresh secret data")
 						return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 					}
 				}
 			}
 			// Secret already exists and is valid - continue with injection
 		} else {
-			// Other error creating secret
+			// Other error creating secret (non-retryable or retries exhausted)
 			duration := time.Since(startTime).Seconds()
 			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-			sanitizedErr := SanitizeError(err, "create ephemeral secret")
+			sanitizedErr := SanitizeError(createErr, "create ephemeral secret")
 			return admission.Errored(http.StatusInternalServerError, sanitizedErr)
 		}
 	}
