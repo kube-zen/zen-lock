@@ -433,6 +433,8 @@ func TestFullLifecycle_Integration(t *testing.T) {
 
 	client := clientBuilder.WithObjects(zenlock).Build()
 
+	ctx := context.Background()
+
 	// Step 1: Create Pod
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
