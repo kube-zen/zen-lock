@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -33,8 +34,8 @@ import (
 
 func setupTestPodHandler(t *testing.T) (*PodHandler, *fake.ClientBuilder) {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	securityv1alpha1.AddToScheme(scheme)
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
 
 	clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
 

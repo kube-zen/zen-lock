@@ -194,7 +194,7 @@ func TestZenLockCRD_Exists(t *testing.T) {
 	if gvk.Kind != "ZenLock" {
 		t.Errorf("Expected kind 'ZenLock', got '%s'", gvk.Kind)
 	}
-	
+
 	// Also verify we can create a GVK directly
 	expectedGVK := schema.GroupVersionKind{
 		Group:   "security.zen.io",

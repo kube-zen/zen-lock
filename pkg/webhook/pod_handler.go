@@ -17,8 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.zen.io/v1alpha1"
-	"github.com/kube-zen/zen-lock/pkg/crypto"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
+	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
 
 const (

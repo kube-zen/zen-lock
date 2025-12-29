@@ -29,7 +29,7 @@ func ValidateZenLock(zenlock *securityv1alpha1.ZenLock) error {
 		return fmt.Errorf("zenlock is nil")
 	}
 
-	if zenlock.Spec.EncryptedData == nil || len(zenlock.Spec.EncryptedData) == 0 {
+	if len(zenlock.Spec.EncryptedData) == 0 {
 		return fmt.Errorf("encryptedData cannot be empty")
 	}
 
