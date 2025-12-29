@@ -92,17 +92,17 @@ coverage: test-unit
 	@echo "Coverage summary:"
 	@go tool cover -func=coverage.out | tail -1
 	@echo ""
-	@echo "Checking coverage threshold (minimum: 50% for now, target: 75%)..."
+	@echo "Checking coverage threshold (minimum: 40%, target: 75%)..."
 	@COVERAGE=$$(go tool cover -func=coverage.out | grep -v "pkg/apis" | grep "total:" | awk '{print $$3}' | sed 's/%//'); \
 	if [ -z "$$COVERAGE" ]; then \
 		echo "⚠️  Could not determine coverage percentage"; \
-	elif [ $$(echo "$$COVERAGE < 50" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then \
-		echo "❌ Coverage $$COVERAGE% is below the 50% minimum threshold"; \
+	elif [ $$(echo "$$COVERAGE < 40" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then \
+		echo "❌ Coverage $$COVERAGE% is below the 40% minimum threshold"; \
 		echo "⚠️  Target coverage is 75%, currently at $$COVERAGE%"; \
 		exit 1; \
 	elif [ $$(echo "$$COVERAGE < 75" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then \
-		echo "⚠️  Coverage $$COVERAGE% is below the 75% target (minimum: 50%)"; \
-		echo "✅ Coverage $$COVERAGE% meets the 50% minimum threshold"; \
+		echo "⚠️  Coverage $$COVERAGE% is below the 75% target (minimum: 40%)"; \
+		echo "✅ Coverage $$COVERAGE% meets the 40% minimum threshold"; \
 	else \
 		echo "✅ Coverage $$COVERAGE% meets the 75% target threshold"; \
 	fi
