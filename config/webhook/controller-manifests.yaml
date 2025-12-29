@@ -21,28 +21,28 @@ spec:
     spec:
       serviceAccountName: zen-lock-controller
       containers:
-      - name: controller
-        image: kube-zen/zen-lock-webhook:latest
-        imagePullPolicy: IfNotPresent
-        args:
-        - --metrics-bind-address=:8080
-        - --health-probe-bind-address=:8081
-        - --leader-elect=true
-        - --enable-controller=true
-        - --enable-webhook=false
-        env:
-        - name: ZEN_LOCK_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: zen-lock-master-key
-              key: key.txt
-        ports:
-        - containerPort: 8080
-          name: metrics
-          protocol: TCP
-        - containerPort: 8081
-          name: health
-          protocol: TCP
+        - name: controller
+          image: kube-zen/zen-lock-webhook:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --leader-elect=true
+            - --enable-controller=true
+            - --enable-webhook=false
+          env:
+            - name: ZEN_LOCK_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: zen-lock-master-key
+                  key: key.txt
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            - containerPort: 8081
+              name: health
+              protocol: TCP
         livenessProbe:
           httpGet:
             path: /healthz
@@ -62,4 +62,3 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
-

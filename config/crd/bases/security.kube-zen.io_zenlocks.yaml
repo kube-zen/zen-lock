@@ -136,7 +136,7 @@ spec:
                 type: string
             type: object
         type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+      served: true
+      storage: true
+      subresources:
+        status: {}

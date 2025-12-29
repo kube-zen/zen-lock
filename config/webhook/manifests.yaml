@@ -10,8 +10,8 @@ metadata:
   namespace: zen-lock-system
 spec:
   ports:
-  - port: 443
-    targetPort: 9443
+    - port: 443
+      targetPort: 9443
   selector:
     app: zen-lock-webhook
 ---
