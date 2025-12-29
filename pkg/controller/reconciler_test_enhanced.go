@@ -22,14 +22,45 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 )
 
+// setupTestReconcilerEnhanced is a helper function for enhanced tests
+func setupTestReconcilerEnhanced(t *testing.T) (*ZenLockReconciler, *fake.ClientBuilder) {
+	// Set test private key
+	originalKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
+	defer func() {
+		if originalKey != "" {
+			os.Setenv("ZEN_LOCK_PRIVATE_KEY", originalKey)
+		} else {
+			os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+		}
+	}()
+
+	os.Setenv("ZEN_LOCK_PRIVATE_KEY", "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE")
+
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add securityv1alpha1 to scheme: %v", err)
+	}
+
+	clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
+
+	reconciler, err := NewZenLockReconciler(clientBuilder.Build(), scheme)
+	if err != nil {
+		t.Fatalf("Failed to create reconciler: %v", err)
+	}
+
+	return reconciler, clientBuilder
+}
+
 func TestZenLockReconciler_Reconcile_NoPrivateKey(t *testing.T) {
-	reconciler, clientBuilder := setupTestReconciler(t)
+	reconciler, clientBuilder := setupTestReconcilerEnhanced(t)
 	if reconciler == nil {
 		t.Fatal("setupTestReconciler returned nil reconciler")
 	}
@@ -87,7 +118,7 @@ func TestZenLockReconciler_Reconcile_NoPrivateKey(t *testing.T) {
 }
 
 func TestZenLockReconciler_Reconcile_DecryptionFailed(t *testing.T) {
-	reconciler, clientBuilder := setupTestReconciler(t)
+	reconciler, clientBuilder := setupTestReconcilerEnhanced(t)
 	if reconciler == nil {
 		t.Fatal("setupTestReconciler returned nil reconciler")
 	}
