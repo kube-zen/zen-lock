@@ -25,14 +25,16 @@ The CLI is used by developers to encrypt secrets before committing them to Git.
 ### 2. Controller (`cmd/webhook`)
 
 The controller runs as a Kubernetes Deployment and includes:
-- Controller reconciler for ZenLock CRDs
+- ZenLock reconciler for ZenLock CRDs
+- Secret reconciler for ephemeral Secret lifecycle
 - Mutating admission webhook server
 
 **Responsibilities:**
 - Reconcile ZenLock CRDs and update status
+- Set OwnerReferences on ephemeral Secrets (once Pod UID is available)
+- Clean up orphaned Secrets (Pods that don't exist)
 - Handle Pod admission requests
 - Inject secrets into Pods
-- Create ephemeral secrets
 
 ### 3. Webhook Handler (`pkg/webhook`)
 
@@ -44,8 +46,16 @@ The webhook handler intercepts Pod creation requests.
 3. Fetch ZenLock CRD
 4. Validate AllowedSubjects (if configured)
 5. Decrypt secret data
-6. Create ephemeral Secret with OwnerReference to Pod
-7. Patch Pod to mount secret
+6. Create ephemeral Secret with labels (OwnerReference set by controller)
+7. If secret already exists, validate and refresh stale data
+8. Patch Pod to mount secret
+
+**Stale-Secret Handling:**
+- If a Secret already exists (e.g., Pod name reused), the webhook validates:
+  - Secret matches current ZenLock (by label)
+  - Secret data matches current decrypted data
+- If stale, the webhook refreshes the Secret with current data
+- Prevents stale secrets from persisting when Pod names are reused
 
 ### 4. Crypto Library (`pkg/crypto`)
 
@@ -96,10 +106,25 @@ Pod Creation:
 ## Ephemeral Secrets
 
 Ephemeral secrets are standard Kubernetes Secrets with:
-- OwnerReference pointing to the Pod
+- Labels for tracking (pod name, namespace, ZenLock name)
+- OwnerReference pointing to the Pod (set by SecretReconciler)
 - Automatic cleanup when Pod is deleted
-- Unique name based on Pod UID
+- Stable name based on namespace and pod name (SHA256 hash)
 - Same namespace as Pod
+
+### Secret Lifecycle
+
+1. **Creation**: Webhook creates Secret with labels (Pod UID not yet available)
+2. **OwnerReference**: SecretReconciler sets OwnerReference once Pod UID is available
+3. **Cleanup**: Kubernetes automatically deletes Secret when Pod is deleted
+4. **Orphan Cleanup**: SecretReconciler deletes orphaned Secrets (>1 minute old, Pod not found)
+
+### Stale-Secret Prevention
+
+- Webhook validates existing Secrets on `AlreadyExists` errors
+- Checks if Secret matches current ZenLock (by label)
+- Refreshes Secret data if ZenLock was updated
+- Prevents stale secrets when Pod names are reused
 
 ## Webhook Configuration
 

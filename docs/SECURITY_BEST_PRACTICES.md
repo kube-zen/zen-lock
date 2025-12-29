@@ -32,6 +32,8 @@ zen-lock implements Zero-Knowledge encryption with the following security proper
 - Contain decrypted plaintext data
 - Short-lived (only exist during Pod lifetime)
 - Automatically deleted when Pod terminates (via OwnerReference)
+- Orphaned Secrets (>1 minute old, Pod not found) are automatically cleaned up
+- Stale secrets are validated and refreshed when Pod names are reused
 
 ### Important Security Considerations
 
@@ -332,6 +334,8 @@ zen-lock helps with compliance by:
 - **Zero-knowledge (ZenLock CRD)**: API server cannot read encrypted ZenLock data
 - **Ephemeral secrets**: Decrypted secrets exist only during Pod lifetime
 - **Automatic cleanup**: OwnerReference ensures secrets are deleted when Pods terminate
+- **Orphan cleanup**: SecretReconciler automatically deletes orphaned secrets (>1 minute old, Pod not found)
+- **Stale-secret prevention**: Webhook validates and refreshes stale secrets when Pod names are reused
 - **Audit trail**: All operations are logged
 - **RBAC controls**: Fine-grained access control
 

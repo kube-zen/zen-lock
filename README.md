@@ -11,6 +11,7 @@ zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge se
 - **Age Encryption**: Uses modern, easy-to-use encryption (age) by default.
 - **AllowedSubjects**: Restrict secret access to specific ServiceAccounts.
 - **Comprehensive Testing**: Full integration and E2E test coverage.
+- **Production-Ready**: Orphan cleanup, stale-secret prevention, least-privilege RBAC.
 
 ## Quick Start
 

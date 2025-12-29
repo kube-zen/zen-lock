@@ -47,15 +47,16 @@ The `zen-lock-controller` ClusterRole includes the following permissions:
 ```yaml
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
 ```
 
 **Purpose**: Controller needs to:
 - Read Secrets created by webhook (to set OwnerReferences)
 - Update Secrets to add OwnerReferences when Pod exists
 - Watch Secrets for reconciliation
+- Delete orphaned Secrets (Pods that don't exist, >1 minute old)
 
-**Note**: Controller does NOT create or delete Secrets - webhook creates them, Kubernetes deletes them via OwnerReference.
+**Note**: Controller does NOT create Secrets - webhook creates them. Controller sets OwnerReferences and cleans up orphans.
 
 ### Controller: Pod Permissions
 
@@ -92,27 +93,19 @@ The `zen-lock-webhook` ClusterRole includes the following permissions:
 ```yaml
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create"]
+  verbs: ["create", "get", "update"]
 ```
 
 **Purpose**: Webhook needs to:
 - Create ephemeral Secrets for Pod injection
+- Get existing Secrets to validate/refresh stale data
+- Update Secrets if stale (when Pod name is reused or ZenLock is updated)
 
-**Note**: Webhook does NOT need get/list/watch/update/delete - it only creates Secrets.
+**Note**: Webhook does NOT need list/watch/delete - it only creates/updates specific Secrets.
 
 ### Webhook: Pod Permissions
 
-```yaml
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get"]
-```
-
-**Purpose**: Webhook needs read access to:
-- Read Pod metadata during admission (for ServiceAccount validation)
-- Get Pod name and namespace for Secret naming
-
-**Note**: Webhook does NOT modify Pods directly - it uses mutating admission webhooks which operate on admission requests.
+**None required**: The webhook uses the admission request object directly and does not need to read Pods from the API server.
 
 ### Event Permissions
 
