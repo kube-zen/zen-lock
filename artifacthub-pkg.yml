@@ -1,0 +1,20 @@
+# Artifact Hub package metadata
+# See: https://artifacthub.io/docs/topics/repositories/#repository-metadata-file
+
+# Repository metadata file for zen-lock Helm chart
+# This file should be placed in the root of the repository
+
+# Artifact Hub will automatically discover this chart when:
+# 1. Repository is added to Artifact Hub
+# 2. Chart is published to GitHub Pages (docs/ directory)
+# 3. Repository URL is: https://kube-zen.github.io/zen-lock
+
+# Chart metadata is read from charts/zen-lock/Chart.yaml
+# Additional metadata can be provided here if needed
+
+# For Artifact Hub integration:
+# 1. Add repository to Artifact Hub: https://artifacthub.io/add-repo
+# 2. Repository URL: https://kube-zen.github.io/zen-lock
+# 3. Repository type: Helm charts
+# 4. Artifact Hub will automatically index charts from the repository
+

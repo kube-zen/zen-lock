@@ -111,11 +111,24 @@ kubectl apply -f config/webhook/
 ```
 
 **Using Helm:**
+
+The chart is available via GitHub Pages and Artifact Hub:
+
 ```bash
+# Add the repository
 helm repo add zen-lock https://kube-zen.github.io/zen-lock
 helm repo update
-helm install zen-lock zen-lock/zen-lock --namespace zen-lock-system --create-namespace
+
+# Install zen-lock
+helm install zen-lock zen-lock/zen-lock \
+  --namespace zen-lock-system \
+  --create-namespace
 ```
+
+- **GitHub Pages**: https://kube-zen.github.io/zen-lock
+- **Artifact Hub**: https://artifacthub.io/packages/helm/zen-lock/zen-lock
+
+See [Helm Repository Documentation](docs/HELM_REPOSITORY.md) for details.
 
 ## Configuration
 
@@ -245,6 +258,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md)** - Security guidelines
 - **[Testing Guide](docs/TESTING.md)** - Testing infrastructure and coverage
 - **[Metrics](docs/METRICS.md)** - Prometheus metrics documentation
+- **[Helm Repository](docs/HELM_REPOSITORY.md)** - Helm chart repository setup and usage
 
 ## Troubleshooting
 

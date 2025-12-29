@@ -17,7 +17,7 @@ zen-lock provides Zero-Knowledge secret management for Kubernetes, ensuring secr
 ### Quick Start
 
 ```bash
-# Add the repository (if using a Helm repository)
+# Add the repository
 helm repo add zen-lock https://kube-zen.github.io/zen-lock
 helm repo update
 
@@ -26,6 +26,8 @@ helm install zen-lock zen-lock/zen-lock \
   --namespace zen-lock-system \
   --create-namespace
 ```
+
+**Note**: The chart is also available on [Artifact Hub](https://artifacthub.io/packages/helm/zen-lock/zen-lock).
 
 ### From Local Chart
 
@@ -212,9 +214,15 @@ kubectl delete crd zenlocks.security.zen.io
 - **TLS**: Use cert-manager for production TLS certificate management.
 - **Network Policies**: Consider adding NetworkPolicies to restrict webhook access.
 
+## Chart Repository
+
+- **GitHub Pages**: https://kube-zen.github.io/zen-lock
+- **Artifact Hub**: https://artifacthub.io/packages/helm/zen-lock/zen-lock
+
 ## Support
 
 For issues and questions:
 - GitHub: https://github.com/kube-zen/zen-lock
 - Documentation: https://github.com/kube-zen/zen-lock/docs
+- Helm Repository: See [docs/HELM_REPOSITORY.md](../../docs/HELM_REPOSITORY.md)
 
