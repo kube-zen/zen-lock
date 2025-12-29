@@ -520,7 +520,7 @@ func TestPodInjection_E2E(t *testing.T) {
 
 	// Wait a bit for controller to set OwnerReference (if it hasn't already)
 	time.Sleep(2 * time.Second)
-	
+
 	// Refresh secret to check for OwnerReference
 	if err := k8sClient.Get(ctx, secretNN, secret); err != nil {
 		t.Fatalf("Failed to refresh Secret: %v", err)
