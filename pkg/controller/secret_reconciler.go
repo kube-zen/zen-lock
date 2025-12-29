@@ -119,10 +119,23 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Controller: &controller,
 	}
 
-	// Update Secret with OwnerReference
+	// Update Secret with OwnerReference (with retry for conflict errors)
 	secret.OwnerReferences = []metav1.OwnerReference{ownerRef}
-	if err := r.Update(ctx, secret); err != nil {
-		logger.Error(err, "Failed to update Secret with OwnerReference", "secret", req.NamespacedName, "pod", podKey)
+	retryConfig := common.DefaultRetryConfig()
+	retryConfig.MaxAttempts = 3
+	retryConfig.InitialDelay = 100 * time.Millisecond
+	retryConfig.MaxDelay = 2 * time.Second
+
+	if err := common.Retry(ctx, retryConfig, func() error {
+		// Re-fetch secret to get latest version (for conflict resolution)
+		currentSecret := &corev1.Secret{}
+		if err := r.Get(ctx, req.NamespacedName, currentSecret); err != nil {
+			return err
+		}
+		currentSecret.OwnerReferences = []metav1.OwnerReference{ownerRef}
+		return r.Update(ctx, currentSecret)
+	}); err != nil {
+		logger.Error(err, "Failed to update Secret with OwnerReference after retries", "secret", req.NamespacedName, "pod", podKey)
 		return ctrl.Result{}, fmt.Errorf("failed to update Secret: %w", err)
 	}
 

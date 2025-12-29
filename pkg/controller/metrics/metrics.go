@@ -168,3 +168,14 @@ func RecordAlgorithmUsage(algorithm, operation string) {
 func RecordAlgorithmError(algorithm, reason string) {
 	AlgorithmErrorsTotal.WithLabelValues(algorithm, reason).Inc()
 }
+
+// UpdateCacheMetrics updates cache size and hit rate metrics
+func UpdateCacheMetrics(size int, hits, misses int64) {
+	CacheSizeGauge.Set(float64(size))
+	if hits+misses > 0 {
+		hitRate := float64(hits) / float64(hits+misses)
+		CacheHitRateGauge.Set(hitRate)
+	} else {
+		CacheHitRateGauge.Set(0)
+	}
+}
