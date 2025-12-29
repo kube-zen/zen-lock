@@ -19,7 +19,6 @@ package logging
 import (
 	"errors"
 	"testing"
-	"time"
 
 	zlerrors "github.com/kube-zen/zen-lock/pkg/errors"
 )
