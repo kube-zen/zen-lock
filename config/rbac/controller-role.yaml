@@ -39,6 +39,6 @@ roleRef:
   name: zen-lock-controller
 subjects:
   - kind: ServiceAccount
-    name: zen-lock-controller
+    name: zen-lock-webhook
     namespace: zen-lock-system
 

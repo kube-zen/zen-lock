@@ -10,21 +10,28 @@ zen-lock requires specific RBAC permissions to:
 - Read Pod information for webhook injection
 - Record events and manage leader election
 
-## ClusterRole
+## RBAC Architecture
 
-The `zen-lock-manager` ClusterRole includes the following permissions:
+zen-lock uses separate roles for the controller and webhook to follow the principle of least privilege:
 
-### ZenLock CRD Permissions
+- **zen-lock-controller**: Minimal permissions for controller operations
+- **zen-lock-webhook**: Minimal permissions for webhook operations
+- **zen-lock-manager**: Deprecated combined role (kept for backward compatibility)
+
+## Controller Role
+
+The `zen-lock-controller` ClusterRole includes the following permissions:
+
+### Controller: ZenLock CRD Permissions
 
 ```yaml
 - apiGroups: ["security.zen.io"]
   resources: ["zenlocks"]
-  verbs: ["get", "list", "watch", "create", "update", "patch"]
+  verbs: ["get", "list", "watch"]
 ```
 
-**Purpose**: Controller needs full access to ZenLock CRDs to:
+**Purpose**: Controller needs read access to:
 - Watch for new/updated ZenLocks
-- Update ZenLock status
 - Reconcile ZenLock state
 
 ```yaml
@@ -35,22 +42,22 @@ The `zen-lock-manager` ClusterRole includes the following permissions:
 
 **Purpose**: Update ZenLock status fields (Phase, Conditions, etc.)
 
-### Secret Permissions
+### Controller: Secret Permissions
 
 ```yaml
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["get", "list", "watch", "create"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 ```
 
-**Purpose**: Webhook needs to:
-- Create ephemeral Secrets for Pods
-- Read Secrets to verify creation
-- List/Watch for cleanup operations
+**Purpose**: Controller needs to:
+- Read Secrets created by webhook (to set OwnerReferences)
+- Update Secrets to add OwnerReferences when Pod exists
+- Watch Secrets for reconciliation
 
-**Note**: zen-lock does NOT need `delete` permission - Secrets are automatically deleted by Kubernetes when the Pod is deleted (via OwnerReference).
+**Note**: Controller does NOT create or delete Secrets - webhook creates them, Kubernetes deletes them via OwnerReference.
 
-### Pod Permissions
+### Controller: Pod Permissions
 
 ```yaml
 - apiGroups: [""]
@@ -58,12 +65,54 @@ The `zen-lock-manager` ClusterRole includes the following permissions:
   verbs: ["get", "list", "watch"]
 ```
 
-**Purpose**: Webhook needs read access to:
-- Read Pod metadata for injection
-- Verify Pod ServiceAccount for AllowedSubjects validation
-- Check Pod UID for unique Secret naming
+**Purpose**: Controller needs read access to:
+- Get Pod UID for setting OwnerReferences
+- Verify Pod exists before setting OwnerReference
 
-**Note**: zen-lock does NOT modify Pods directly - it uses mutating admission webhooks which operate on admission requests.
+## Webhook Role
+
+The `zen-lock-webhook` ClusterRole includes the following permissions:
+
+### Webhook: ZenLock CRD Permissions
+
+```yaml
+- apiGroups: ["security.zen.io"]
+  resources: ["zenlocks"]
+  verbs: ["get"]
+```
+
+**Purpose**: Webhook needs read access to:
+- Fetch ZenLock CRD during Pod admission
+- Decrypt secret data
+
+**Note**: Webhook does NOT need list/watch - it only reads specific ZenLocks by name.
+
+### Webhook: Secret Permissions
+
+```yaml
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+```
+
+**Purpose**: Webhook needs to:
+- Create ephemeral Secrets for Pod injection
+
+**Note**: Webhook does NOT need get/list/watch/update/delete - it only creates Secrets.
+
+### Webhook: Pod Permissions
+
+```yaml
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
+```
+
+**Purpose**: Webhook needs read access to:
+- Read Pod metadata during admission (for ServiceAccount validation)
+- Get Pod name and namespace for Secret naming
+
+**Note**: Webhook does NOT modify Pods directly - it uses mutating admission webhooks which operate on admission requests.
 
 ### Event Permissions
 
@@ -90,28 +139,53 @@ The `zen-lock-manager` ClusterRole includes the following permissions:
 - Ensure only one controller instance is active
 - Coordinate controller startup/shutdown
 
-## ClusterRoleBinding
+## ClusterRoleBindings
 
-The `zen-lock-manager` ClusterRoleBinding binds the ClusterRole to the ServiceAccount:
+### Controller Binding
+
+The `zen-lock-controller` ClusterRoleBinding binds the controller role to the webhook ServiceAccount (since controller and webhook run in the same process):
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: zen-lock-manager
+  name: zen-lock-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: zen-lock-manager
+  name: zen-lock-controller
 subjects:
   - kind: ServiceAccount
     name: zen-lock-webhook
     namespace: zen-lock-system
 ```
 
-## ServiceAccount
+**Note**: Both controller and webhook run in the same binary (`zen-lock-webhook`), so they share the same ServiceAccount (`zen-lock-webhook`). Both ClusterRoles are bound to this ServiceAccount.
 
-The controller runs as a ServiceAccount:
+### Webhook Binding
+
+The `zen-lock-webhook` ClusterRoleBinding binds the webhook role to the webhook ServiceAccount:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zen-lock-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zen-lock-webhook
+subjects:
+  - kind: ServiceAccount
+    name: zen-lock-webhook
+    namespace: zen-lock-system
+```
+
+## ServiceAccounts
+
+zen-lock uses a single ServiceAccount for both controller and webhook (they run in the same process):
+
+### Webhook ServiceAccount
 
 ```yaml
 apiVersion: v1
@@ -120,6 +194,23 @@ metadata:
   name: zen-lock-webhook
   namespace: zen-lock-system
 ```
+
+**Note**: Both the controller (`ZenLockReconciler`, `SecretReconciler`) and webhook (`PodHandler`) run in the same binary (`zen-lock-webhook`), so they share the same ServiceAccount. Both `zen-lock-controller` and `zen-lock-webhook` ClusterRoles are bound to this ServiceAccount.
+
+## Deprecated: Combined Role
+
+The `zen-lock-manager` ClusterRole is deprecated but kept for backward compatibility:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zen-lock-manager
+  annotations:
+    rbac.authorization.k8s.io/justification: "DEPRECATED: Use zen-lock-controller and zen-lock-webhook roles instead."
+```
+
+**Migration**: Update deployments to use separate roles (`controller-role.yaml` and `webhook-role.yaml`).
 
 ## User Permissions
 
