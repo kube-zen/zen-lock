@@ -365,7 +365,7 @@ Set up alerts for:
 zen-lock helps with compliance by:
 
 - **Encryption at rest (ZenLock CRD)**: Source-of-truth secrets stored as ciphertext in etcd
-- **Zero-knowledge (ZenLock CRD)**: API server cannot read encrypted ZenLock data
+- **Zero-knowledge (ZenLock CRD)**: API server/etcd cannot read the ZenLock CRD payload (ciphertext). Zero-knowledge applies to the ZenLock CRD (ciphertext). Runtime delivery exposes plaintext to the workload and to any principal that can read the generated Kubernetes Secret.
 - **Ephemeral secrets**: Decrypted secrets exist only during Pod lifetime
 - **Automatic cleanup**: OwnerReference ensures secrets are deleted when Pods terminate
 - **Orphan cleanup**: SecretReconciler automatically deletes orphaned secrets (>1 minute old, Pod not found)
