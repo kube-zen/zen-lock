@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	filippo.io/age v1.1.1
-	github.com/kube-zen/zen-sdk v0.0.0-20251230120957-3c45ee63e7a6
+	github.com/kube-zen/zen-sdk v0.0.0-20251230132327-b9a8f6d9a39f
 	github.com/prometheus/client_golang v1.19.1
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/yaml.v3 v3.0.1

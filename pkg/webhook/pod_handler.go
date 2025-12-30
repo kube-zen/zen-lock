@@ -119,6 +119,10 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
+	// HA enforcement is handled upstream by zen-lead's Validating Admission Webhook
+	// If this Pod creation request reached here, it means zen-lead has allowed it (it's the leader)
+	// No need to check leader status here - zen-lead blocks non-leader Pod creation at the API level
+
 	// Check if injection is requested
 	injectName := pod.GetAnnotations()[annotationInject]
 	if injectName == "" {
