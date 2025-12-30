@@ -72,7 +72,8 @@ func main() {
 		Enable:    enableLeaderElection,
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	// Build manager options
+	mgrOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
@@ -82,7 +83,12 @@ func main() {
 			CertDir: certDir,
 		}),
 		HealthProbeBindAddress: probeAddr,
-	}, leader.Setup(leaderOpts))
+	}
+
+	// Apply leader election configuration
+	mgrOpts = leader.ManagerOptions(mgrOpts, leaderOpts)
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
