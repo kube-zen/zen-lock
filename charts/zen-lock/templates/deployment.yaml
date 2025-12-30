@@ -22,7 +22,11 @@ metadata:
     {{- include "zen-lock.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhook
 spec:
-  replicas: {{ .Values.replicaCount }}
+  {{- if .Values.ha.enabled }}
+  replicas: 3
+  {{- else }}
+  replicas: 1
+  {{- end }}
   selector:
     matchLabels:
       {{- include "zen-lock.selectorLabels" . | nindent 6 }}
@@ -54,9 +58,8 @@ spec:
             - --cert-dir={{ .Values.webhook.certDir }}
             - --metrics-bind-address=:{{ .Values.metrics.port }}
             - --health-probe-bind-address=:8081
-            {{- if .Values.leaderElection.enabled }}
+            {{- if .Values.ha.enabled }}
             - --leader-elect=true
-            - --leader-election-namespace={{ include "zen-lock.leaderElectionNamespace" . }}
             {{- else }}
             - --leader-elect=false
             {{- end }}
@@ -135,5 +138,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+---
+# NOTES: High Availability Warning
+{{- if not .Values.ha.enabled }}
+# WARNING: Running with High Availability disabled (replicas=1). This is not recommended
+# for production workloads due to risk of split-brain during upgrades or failures.
+# Ensure you have an external leader election mechanism configured if running multiple
+# replicas manually.
+{{- end }}
 {{- end }}
 

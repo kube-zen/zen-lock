@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -43,7 +44,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
+		"Enable leader election for HA (uses zen-lead when enabled). "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&certDir, "cert-dir", "/tmp/k8s-webhook-server/serving-certs",
 		"The directory where cert-manager injects the TLS certificates.")
@@ -66,10 +67,34 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Configure leader election using zen-sdk
-	leaderOpts := leader.Options{
-		LeaseName: "zen-lock-webhook-leader-election",
-		Enable:    enableLeaderElection,
+	// Get namespace for leader election
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		// Try to read from service account namespace file
+		if ns, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+			namespace = string(ns)
+		} else {
+			namespace = "zen-lock-system"
+		}
+	}
+
+	// Configure leader election: when enabled, use zen-lead (recommended)
+	var externalWatcher *leader.Watcher
+	var shouldReconcile func() bool = func() bool { return true }
+
+	if enableLeaderElection {
+		// Use zen-lead for leader election (recommended)
+		shouldReconcile = func() bool {
+			if externalWatcher == nil {
+				return false // Not initialized yet
+			}
+			return externalWatcher.GetIsLeader()
+		}
+		setupLog.Info("Starting with zen-lead leader election. Waiting for leader role...")
+	} else {
+		// HA disabled - always reconcile (accept split-brain risk)
+		shouldReconcile = func() bool { return true }
+		setupLog.Info("Running with HA disabled. Accepting split-brain risk. Not recommended for production.")
 	}
 
 	// Build manager options
@@ -85,8 +110,8 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 	}
 
-	// Apply leader election configuration
-	mgrOpts = leader.ManagerOptions(mgrOpts, leaderOpts)
+	// Disable built-in leader election (use zen-lead instead when enabled)
+	mgrOpts.LeaderElection = false
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
 	if err != nil {
@@ -94,9 +119,40 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Setup external watcher for zen-lead (must be done after manager is created)
+	ctx, cancel := signal.NotifyContext(ctrl.SetupSignalHandler(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	if enableLeaderElection {
+		watcher, err := leader.NewWatcher(mgr.GetClient(), func(isLeader bool) {
+			if isLeader {
+				setupLog.Info("Elected as leader via zen-lead. Starting reconciliation...")
+			} else {
+				setupLog.Info("Lost leadership via zen-lead. Pausing reconciliation...")
+			}
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to create external leader watcher")
+			os.Exit(1)
+		}
+		externalWatcher = watcher
+
+		// Start watching in background
+		go func() {
+			if err := watcher.Watch(ctx); err != nil && err != context.Canceled {
+				setupLog.Error(err, "error watching leader status")
+			}
+		}()
+	}
+
 	// Setup ZenLock controller (if enabled)
 	if enableController {
-		zenlockReconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
+		var zenlockReconciler *controller.ZenLockReconciler
+		if enableLeaderElection {
+			zenlockReconciler, err = controller.NewZenLockReconcilerWithLeaderCheck(mgr.GetClient(), mgr.GetScheme(), shouldReconcile)
+		} else {
+			zenlockReconciler, err = controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
+		}
 		if err != nil {
 			setupLog.Error(err, "unable to create ZenLock reconciler")
 			os.Exit(1)
@@ -143,10 +199,6 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
-
-	// Setup signal handling
-	ctx, cancel := signal.NotifyContext(ctrl.SetupSignalHandler(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

@@ -16,6 +16,17 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# High Availability (HA) configuration
+# ha.enabled: false (default) -> Single replica, no leader election (dev/testing only)
+# ha.enabled: true -> 3 replicas with leader election via zen-lead (recommended)
+# Built-in leader election remains available as optional fallback via --leader-elect flag
+ha:
+  enabled: false  # Default: HA disabled for simple dev/testing setup. When true, uses zen-lead (recommended)
+
+# Replica count is automatically set based on ha.enabled:
+# - ha.enabled=false -> replicas=1
+# - ha.enabled=true -> replicas=3
+# This value is kept for backward compatibility but will be overridden by ha.enabled
 replicaCount: 1
 
 image:
@@ -81,7 +92,7 @@ tolerations: []
 
 affinity: {}
 
-# Leader election configuration
+# Leader election configuration (deprecated: use ha.enabled instead)
 leaderElection:
   enabled: false
   namespace: ""
