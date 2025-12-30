@@ -32,7 +32,6 @@ func init() {
 
 func main() {
 	var metricsAddr string
-	var enableLeaderElection bool
 	var probeAddr string
 	var certDir string
 	var enableController bool
@@ -40,16 +39,12 @@ func main() {
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	// Deprecated: leader-elect flag removed. Leader election is now automatic:
-	// - Controller mode: always enabled (mandatory)
-	// - Webhook-only mode: always disabled (webhooks scale horizontally)
-	_ = enableLeaderElection // Keep for backward compatibility but ignore
 	flag.StringVar(&certDir, "cert-dir", "/tmp/k8s-webhook-server/serving-certs",
 		"The directory where cert-manager injects the TLS certificates.")
 	flag.BoolVar(&enableController, "enable-controller", true,
-		"Enable the controller (ZenLock and Secret reconcilers).")
+		"Enable the controller (ZenLock and Secret reconcilers). Leader election is mandatory when enabled.")
 	flag.BoolVar(&enableWebhook, "enable-webhook", true,
-		"Enable the mutating admission webhook.")
+		"Enable the mutating admission webhook. Leader election is disabled for webhook-only mode.")
 
 	opts := zap.Options{
 		Development: true,
@@ -65,15 +60,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Get namespace for leader election
-	namespace := os.Getenv("POD_NAMESPACE")
-	if namespace == "" {
-		// Try to read from service account namespace file
-		if ns, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-			namespace = string(ns)
-		} else {
-			namespace = "zen-lock-system"
+	// Get namespace for leader election (required if controller is enabled)
+	var namespace string
+	if enableController {
+		var err error
+		namespace, err = leader.RequirePodNamespace()
+		if err != nil {
+			setupLog.Error(err, "failed to determine pod namespace for leader election (required when controller is enabled)")
+			os.Exit(1)
 		}
+	} else {
+		// Webhook-only mode doesn't need namespace (no leader election)
+		namespace = "zen-lock-system" // Default, not used
 	}
 
 	// Build manager options
