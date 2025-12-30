@@ -40,9 +40,10 @@ func main() {
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable built-in leader election for HA (via zen-sdk/pkg/leader). "+
-			"Enabling this will ensure there is only one active controller manager.")
+	// Deprecated: leader-elect flag removed. Leader election is now automatic:
+	// - Controller mode: always enabled (mandatory)
+	// - Webhook-only mode: always disabled (webhooks scale horizontally)
+	_ = enableLeaderElection // Keep for backward compatibility but ignore
 	flag.StringVar(&certDir, "cert-dir", "/tmp/k8s-webhook-server/serving-certs",
 		"The directory where cert-manager injects the TLS certificates.")
 	flag.BoolVar(&enableController, "enable-controller", true,
@@ -75,13 +76,7 @@ func main() {
 		}
 	}
 
-	// Configure leader election: when enabled, use built-in leader election (zen-sdk/pkg/leader)
-	// When disabled, zen-lead can handle leader routing at network level (zero code changes)
-	if !enableLeaderElection {
-		setupLog.Info("Running with built-in leader election disabled. If using zen-lead, configure Service annotation. Otherwise accepting split-brain risk.")
-	}
-
-	// Build manager options with built-in leader election
+	// Build manager options
 	mgrOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -94,15 +89,21 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 	}
 
-	// Configure built-in leader election via zen-sdk
-	if enableLeaderElection {
-		leaderOpts := leader.Options{
-			LeaseName: "zen-lock-webhook-leader-election",
-			Enable:    true,
-			Namespace: namespace,
-		}
-		mgrOpts = leader.ManagerOptions(mgrOpts, leaderOpts)
+	// Configure leader election based on component type:
+	// - Controller: ALWAYS enable leader election (mandatory for HA safety)
+	// - Webhook-only: NEVER enable leader election (webhooks scale horizontally)
+	if enableController {
+		// Controller requires leader election to prevent split-brain
+		leaderElectionID := "zen-lock-controller-leader-election"
+		leader.ApplyRequiredLeaderElection(&mgrOpts, "zen-lock-controller", namespace, leaderElectionID)
+		setupLog.Info("Controller enabled: leader election mandatory for HA safety")
+	} else if enableWebhook {
+		// Webhook-only mode: no leader election (webhooks scale horizontally)
+		mgrOpts.LeaderElection = false
+		setupLog.Info("Webhook-only mode: leader election disabled (webhooks scale horizontally)")
 	} else {
+		// Neither enabled - this shouldn't happen, but handle gracefully
+		setupLog.Info("Neither controller nor webhook enabled")
 		mgrOpts.LeaderElection = false
 	}
 
