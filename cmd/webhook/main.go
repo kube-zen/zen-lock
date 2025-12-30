@@ -19,6 +19,7 @@ import (
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
+	"github.com/kube-zen/zen-sdk/pkg/leader"
 )
 
 var (
@@ -65,6 +66,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Configure leader election using zen-sdk
+	leaderOpts := leader.Options{
+		LeaseName: "zen-lock-webhook-leader-election",
+		Enable:    enableLeaderElection,
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -75,9 +82,7 @@ func main() {
 			CertDir: certDir,
 		}),
 		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "zen-lock-webhook-leader-election",
-	})
+	}, leader.Setup(leaderOpts))
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
