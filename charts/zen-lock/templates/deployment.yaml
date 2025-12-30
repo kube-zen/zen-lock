@@ -60,8 +60,6 @@ spec:
             - --health-probe-bind-address=:8081
             {{- if .Values.ha.enabled }}
             - --leader-elect=true
-            {{- else }}
-            - --leader-elect=false
             {{- end }}
             - --enable-controller=false
             - --enable-webhook=true

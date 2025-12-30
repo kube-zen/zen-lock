@@ -25,12 +25,10 @@ type ZenLockReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	crypto crypto.Encryptor
-	// shouldReconcile is a function that returns true if reconciliation should proceed
-	// Used for external leader election mode (zen-lead)
-	shouldReconcile func() bool
 }
 
-// NewZenLockReconciler creates a new ZenLockReconciler without leader check (for HA disabled mode)
+// NewZenLockReconciler creates a new ZenLockReconciler
+// Leader election is handled by controller-runtime Manager, not in the reconciler
 func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLockReconciler, error) {
 	// Load private key from environment
 	privateKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
@@ -42,31 +40,9 @@ func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLoc
 	encryptor := crypto.NewAgeEncryptor()
 
 	return &ZenLockReconciler{
-		Client:          client,
-		Scheme:          scheme,
-		crypto:          encryptor,
-		shouldReconcile: func() bool { return true }, // Always reconcile when HA disabled
-	}, nil
-}
-
-// NewZenLockReconcilerWithLeaderCheck creates a new ZenLockReconciler with leader check function.
-// shouldReconcile is called at the start of Reconcile to determine if reconciliation should proceed.
-// For external mode (zen-lead), this checks if the pod is the leader.
-func NewZenLockReconcilerWithLeaderCheck(client client.Client, scheme *runtime.Scheme, shouldReconcile func() bool) (*ZenLockReconciler, error) {
-	// Load private key from environment
-	privateKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
-	if privateKey == "" {
-		return nil, fmt.Errorf("ZEN_LOCK_PRIVATE_KEY environment variable is not set")
-	}
-
-	// Initialize crypto
-	encryptor := crypto.NewAgeEncryptor()
-
-	return &ZenLockReconciler{
-		Client:          client,
-		Scheme:          scheme,
-		crypto:          encryptor,
-		shouldReconcile: shouldReconcile,
+		Client: client,
+		Scheme: scheme,
+		crypto: encryptor,
 	}, nil
 }
 
@@ -84,11 +60,8 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := log.FromContext(ctx)
 	startTime := time.Now()
 
-	// Check if this pod should reconcile (leader check for zen-lead mode)
-	if r.shouldReconcile != nil && !r.shouldReconcile() {
-		logger.V(4).Info("Skipping reconciliation - not the leader")
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
+	// Leader election is handled by controller-runtime Manager
+	// No need to check leader status here - Manager only starts reconciler on leader
 
 	// Fetch ZenLock
 	zenlock := &securityv1alpha1.ZenLock{}

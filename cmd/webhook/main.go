@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -44,7 +41,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for HA (uses zen-lead when enabled). "+
+		"Enable built-in leader election for HA (via zen-sdk/pkg/leader). "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&certDir, "cert-dir", "/tmp/k8s-webhook-server/serving-certs",
 		"The directory where cert-manager injects the TLS certificates.")
@@ -78,26 +75,13 @@ func main() {
 		}
 	}
 
-	// Configure leader election: when enabled, use zen-lead (recommended)
-	var externalWatcher *leader.Watcher
-	var shouldReconcile func() bool = func() bool { return true }
-
-	if enableLeaderElection {
-		// Use zen-lead for leader election (recommended)
-		shouldReconcile = func() bool {
-			if externalWatcher == nil {
-				return false // Not initialized yet
-			}
-			return externalWatcher.GetIsLeader()
-		}
-		setupLog.Info("Starting with zen-lead leader election. Waiting for leader role...")
-	} else {
-		// HA disabled - always reconcile (accept split-brain risk)
-		shouldReconcile = func() bool { return true }
-		setupLog.Info("Running with HA disabled. Accepting split-brain risk. Not recommended for production.")
+	// Configure leader election: when enabled, use built-in leader election (zen-sdk/pkg/leader)
+	// When disabled, zen-lead can handle leader routing at network level (zero code changes)
+	if !enableLeaderElection {
+		setupLog.Info("Running with built-in leader election disabled. If using zen-lead, configure Service annotation. Otherwise accepting split-brain risk.")
 	}
 
-	// Build manager options
+	// Build manager options with built-in leader election
 	mgrOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -110,8 +94,17 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 	}
 
-	// Disable built-in leader election (use zen-lead instead when enabled)
-	mgrOpts.LeaderElection = false
+	// Configure built-in leader election via zen-sdk
+	if enableLeaderElection {
+		leaderOpts := leader.Options{
+			LeaseName: "zen-lock-webhook-leader-election",
+			Enable:    true,
+			Namespace: namespace,
+		}
+		mgrOpts = leader.ManagerOptions(mgrOpts, leaderOpts)
+	} else {
+		mgrOpts.LeaderElection = false
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
 	if err != nil {
@@ -119,40 +112,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup external watcher for zen-lead (must be done after manager is created)
-	ctx, cancel := signal.NotifyContext(ctrl.SetupSignalHandler(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	if enableLeaderElection {
-		watcher, err := leader.NewWatcher(mgr.GetClient(), func(isLeader bool) {
-			if isLeader {
-				setupLog.Info("Elected as leader via zen-lead. Starting reconciliation...")
-			} else {
-				setupLog.Info("Lost leadership via zen-lead. Pausing reconciliation...")
-			}
-		})
-		if err != nil {
-			setupLog.Error(err, "unable to create external leader watcher")
-			os.Exit(1)
-		}
-		externalWatcher = watcher
-
-		// Start watching in background
-		go func() {
-			if err := watcher.Watch(ctx); err != nil && err != context.Canceled {
-				setupLog.Error(err, "error watching leader status")
-			}
-		}()
-	}
-
 	// Setup ZenLock controller (if enabled)
+	// Leader election is handled by controller-runtime Manager, not in the reconciler
 	if enableController {
-		var zenlockReconciler *controller.ZenLockReconciler
-		if enableLeaderElection {
-			zenlockReconciler, err = controller.NewZenLockReconcilerWithLeaderCheck(mgr.GetClient(), mgr.GetScheme(), shouldReconcile)
-		} else {
-			zenlockReconciler, err = controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
-		}
+		zenlockReconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
 		if err != nil {
 			setupLog.Error(err, "unable to create ZenLock reconciler")
 			os.Exit(1)
@@ -201,7 +164,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
