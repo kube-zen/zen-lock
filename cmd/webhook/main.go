@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	scheme                 = runtime.NewScheme()
-	setupLog               = ctrl.Log.WithName("setup")
+	scheme                  = runtime.NewScheme()
+	setupLog                = ctrl.Log.WithName("setup")
 	leaderElectionMode      = flag.String("leader-election-mode", "builtin", "Leader election mode: builtin (default), zenlead, or disabled (controller only)")
-	leaderElectionID       = flag.String("leader-election-id", "", "The ID for leader election (default: zen-lock-controller-leader-election). Required for builtin mode.")
+	leaderElectionID        = flag.String("leader-election-id", "", "The ID for leader election (default: zen-lock-controller-leader-election). Required for builtin mode.")
 	leaderElectionLeaseName = flag.String("leader-election-lease-name", "", "The LeaderGroup CRD name (required for zenlead mode)")
 )
 
@@ -118,9 +118,9 @@ func main() {
 				os.Exit(1)
 			}
 			leConfig = zenlead.LeaderElectionConfig{
-				Mode:       zenlead.ZenLeadManaged,
-				LeaseName:  *leaderElectionLeaseName,
-				Namespace:  namespace,
+				Mode:      zenlead.ZenLeadManaged,
+				LeaseName: *leaderElectionLeaseName,
+				Namespace: namespace,
 			}
 			setupLog.Info("Leader election mode: zenlead managed (Profile C)", "leaseName", *leaderElectionLeaseName)
 		case "disabled":
