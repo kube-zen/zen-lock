@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	filippo.io/age v1.1.1
-	github.com/kube-zen/zen-sdk v0.0.0-20251231020410-f6e4bc8c2fc3
+	github.com/kube-zen/zen-sdk v0.1.0-alpha
 	github.com/prometheus/client_golang v1.19.1
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -14,8 +14,6 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	sigs.k8s.io/controller-runtime v0.19.0
 )
-
-replace github.com/kube-zen/zen-sdk => ../zen-sdk
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
