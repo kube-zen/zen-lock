@@ -1,0 +1,7 @@
+projectType: controller
+projectName: zen-lock
+projectDescription: "Kube-ZEN component"
+goVersion: "1.24"
+imageName: "kubezen/zen-lock"
+hasHelmChart: true
+runsRace: true
