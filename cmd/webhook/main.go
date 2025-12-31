@@ -21,8 +21,10 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme              = runtime.NewScheme()
+	setupLog            = ctrl.Log.WithName("setup")
+	leaderElectionID    = flag.String("leader-election-id", "zen-lock-controller-leader-election", "The ID for leader election. Must be unique per controller instance in the same namespace.")
+	enableLeaderElection = flag.Bool("enable-leader-election", true, "Enable leader election for controller HA (default: true). Set to false if you don't want HA or want zen-lead to handle HA instead.")
 )
 
 func init() {
@@ -91,11 +93,8 @@ func main() {
 	// - Controller: Enable leader election by default (can be disabled via --enable-leader-election=false)
 	// - Webhook-only: Never enable leader election (webhooks scale horizontally)
 	if enableController {
-		// Get leader election flag (default: true, can be disabled)
-		enableLeaderElection := true // TODO: Add flag if needed, for now always enabled for controller mode
-		leaderElectionID := "zen-lock-controller-leader-election"
-		leader.ApplyLeaderElection(&mgrOpts, "zen-lock-controller", namespace, leaderElectionID, enableLeaderElection)
-		if enableLeaderElection {
+		leader.ApplyLeaderElection(&mgrOpts, "zen-lock-controller", namespace, *leaderElectionID, *enableLeaderElection)
+		if *enableLeaderElection {
 			setupLog.Info("Leader election enabled for controller HA")
 		} else {
 			setupLog.Warning("Leader election disabled - running without HA (split-brain risk if multiple replicas)")
