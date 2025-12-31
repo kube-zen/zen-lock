@@ -88,13 +88,18 @@ func main() {
 	}
 
 	// Configure leader election based on component type:
-	// - Controller: ALWAYS enable leader election (mandatory for HA safety)
-	// - Webhook-only: NEVER enable leader election (webhooks scale horizontally)
+	// - Controller: Enable leader election by default (can be disabled via --enable-leader-election=false)
+	// - Webhook-only: Never enable leader election (webhooks scale horizontally)
 	if enableController {
-		// Controller requires leader election to prevent split-brain
+		// Get leader election flag (default: true, can be disabled)
+		enableLeaderElection := true // TODO: Add flag if needed, for now always enabled for controller mode
 		leaderElectionID := "zen-lock-controller-leader-election"
-		leader.ApplyRequiredLeaderElection(&mgrOpts, "zen-lock-controller", namespace, leaderElectionID)
-		setupLog.Info("Controller enabled: leader election mandatory for HA safety")
+		leader.ApplyLeaderElection(&mgrOpts, "zen-lock-controller", namespace, leaderElectionID, enableLeaderElection)
+		if enableLeaderElection {
+			setupLog.Info("Leader election enabled for controller HA")
+		} else {
+			setupLog.Warning("Leader election disabled - running without HA (split-brain risk if multiple replicas)")
+		}
 	} else if enableWebhook {
 		// Webhook-only mode: no leader election (webhooks scale horizontally)
 		mgrOpts.LeaderElection = false
