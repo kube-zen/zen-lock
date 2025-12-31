@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -18,13 +19,15 @@ import (
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
 	"github.com/kube-zen/zen-sdk/pkg/leader"
+	"github.com/kube-zen/zen-sdk/pkg/zenlead"
 )
 
 var (
-	scheme              = runtime.NewScheme()
-	setupLog            = ctrl.Log.WithName("setup")
-	leaderElectionID    = flag.String("leader-election-id", "zen-lock-controller-leader-election", "The ID for leader election. Must be unique per controller instance in the same namespace.")
-	enableLeaderElection = flag.Bool("enable-leader-election", true, "Enable leader election for controller HA (default: true). Set to false if you don't want HA or want zen-lead to handle HA instead.")
+	scheme                 = runtime.NewScheme()
+	setupLog               = ctrl.Log.WithName("setup")
+	leaderElectionMode      = flag.String("leader-election-mode", "builtin", "Leader election mode: builtin (default), zenlead, or disabled (controller only)")
+	leaderElectionID       = flag.String("leader-election-id", "", "The ID for leader election (default: zen-lock-controller-leader-election). Required for builtin mode.")
+	leaderElectionLeaseName = flag.String("leader-election-lease-name", "", "The LeaderGroup CRD name (required for zenlead mode)")
 )
 
 func init() {
@@ -62,22 +65,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Get namespace for leader election (required if controller is enabled)
-	var namespace string
-	if enableController {
-		var err error
-		namespace, err = leader.RequirePodNamespace()
-		if err != nil {
-			setupLog.Error(err, "failed to determine pod namespace for leader election (required when controller is enabled)")
-			os.Exit(1)
-		}
-	} else {
-		// Webhook-only mode doesn't need namespace (no leader election)
-		namespace = "zen-lock-system" // Default, not used
-	}
-
 	// Build manager options
-	mgrOpts := ctrl.Options{
+	baseOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
@@ -90,26 +79,102 @@ func main() {
 	}
 
 	// Configure leader election based on component type:
-	// - Controller: Enable leader election by default (can be disabled via --enable-leader-election=false)
-	// - Webhook-only: Never enable leader election (webhooks scale horizontally)
+	// - Controller: Use zenlead package with Profiles B/C
+	// - Webhook-only: Explicitly disable leader election (webhooks scale horizontally)
+	var mgrOpts ctrl.Options
 	if enableController {
-		leader.ApplyLeaderElection(&mgrOpts, "zen-lock-controller", namespace, *leaderElectionID, *enableLeaderElection)
-		if *enableLeaderElection {
-			setupLog.Info("Leader election enabled for controller HA")
-		} else {
-			setupLog.Info("Leader election disabled - running without HA (split-brain risk if multiple replicas)")
+		// Get namespace (required for leader election)
+		namespace, err := leader.RequirePodNamespace()
+		if err != nil {
+			setupLog.Error(err, "failed to determine pod namespace (required when controller is enabled)")
+			os.Exit(1)
+		}
+
+		// Apply REST config defaults
+		restCfg := ctrl.GetConfigOrDie()
+		zenlead.ControllerRuntimeDefaults(restCfg)
+
+		// Configure leader election using zenlead package (Profiles B/C)
+		var leConfig zenlead.LeaderElectionConfig
+
+		// Determine election ID (default if not provided)
+		electionID := *leaderElectionID
+		if electionID == "" {
+			electionID = "zen-lock-controller-leader-election"
+		}
+
+		// Configure based on mode
+		switch *leaderElectionMode {
+		case "builtin":
+			leConfig = zenlead.LeaderElectionConfig{
+				Mode:       zenlead.BuiltIn,
+				ElectionID: electionID,
+				Namespace:  namespace,
+			}
+			setupLog.Info("Leader election mode: builtin (Profile B)")
+		case "zenlead":
+			if *leaderElectionLeaseName == "" {
+				setupLog.Error(fmt.Errorf("--leader-election-lease-name is required when --leader-election-mode=zenlead"), "invalid configuration")
+				os.Exit(1)
+			}
+			leConfig = zenlead.LeaderElectionConfig{
+				Mode:       zenlead.ZenLeadManaged,
+				LeaseName:  *leaderElectionLeaseName,
+				Namespace:  namespace,
+			}
+			setupLog.Info("Leader election mode: zenlead managed (Profile C)", "leaseName", *leaderElectionLeaseName)
+		case "disabled":
+			leConfig = zenlead.LeaderElectionConfig{
+				Mode: zenlead.Disabled,
+			}
+			setupLog.Info("Leader election disabled - single replica only (unsafe if replicas > 1)")
+		default:
+			setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin, zenlead, or disabled)", *leaderElectionMode), "invalid configuration")
+			os.Exit(1)
+		}
+
+		// Prepare manager options with leader election
+		mgrOpts, err := zenlead.PrepareManagerOptions(baseOpts, leConfig)
+		if err != nil {
+			setupLog.Error(err, "failed to prepare manager options")
+			os.Exit(1)
+		}
+
+		// Get replica count from environment (set by Helm/Kubernetes)
+		replicaCount := 1
+		if rcStr := os.Getenv("REPLICA_COUNT"); rcStr != "" {
+			if rc, err := strconv.Atoi(rcStr); err == nil {
+				replicaCount = rc
+			}
+		}
+
+		// Enforce safe HA configuration
+		if err := zenlead.EnforceSafeHA(replicaCount, mgrOpts.LeaderElection); err != nil {
+			setupLog.Error(err, "unsafe HA configuration")
+			os.Exit(1)
 		}
 	} else if enableWebhook {
-		// Webhook-only mode: no leader election (webhooks scale horizontally)
+		// Webhook-only mode: explicitly disable leader election (webhooks scale horizontally)
+		mgrOpts = baseOpts
 		mgrOpts.LeaderElection = false
 		setupLog.Info("Webhook-only mode: leader election disabled (webhooks scale horizontally)")
 	} else {
 		// Neither enabled - this shouldn't happen, but handle gracefully
 		setupLog.Info("Neither controller nor webhook enabled")
+		mgrOpts = baseOpts
 		mgrOpts.LeaderElection = false
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
+	// Get REST config
+	restCfg := ctrl.GetConfigOrDie()
+	if enableController {
+		// Already applied defaults above
+	} else {
+		// Apply defaults for webhook-only mode too
+		zenlead.ControllerRuntimeDefaults(restCfg)
+	}
+
+	mgr, err := ctrl.NewManager(restCfg, mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
