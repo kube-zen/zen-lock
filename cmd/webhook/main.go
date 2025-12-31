@@ -97,7 +97,7 @@ func main() {
 		if *enableLeaderElection {
 			setupLog.Info("Leader election enabled for controller HA")
 		} else {
-			setupLog.Warning("Leader election disabled - running without HA (split-brain risk if multiple replicas)")
+			setupLog.Info("Leader election disabled - running without HA (split-brain risk if multiple replicas)")
 		}
 	} else if enableWebhook {
 		// Webhook-only mode: no leader election (webhooks scale horizontally)
