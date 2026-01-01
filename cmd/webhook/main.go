@@ -59,21 +59,8 @@ func main() {
 	logger = sdklog.NewLogger("zen-lock")
 	setupLog = logger.WithComponent("setup")
 
-	// Initialize OpenTelemetry tracing using SDK
-	ctx := context.Background()
-	if shutdown, err := observability.InitWithDefaults(ctx, "zen-lock"); err != nil {
-		setupLog.Warn("OpenTelemetry tracer initialization failed, continuing without tracing",
-			sdklog.String("error", err.Error()),
-			sdklog.ErrorCode("OTEL_INIT_FAILED"),
-		)
-	} else {
-		setupLog.Info("OpenTelemetry tracing initialized")
-		defer func() {
-			if err := shutdown(ctx); err != nil {
-				setupLog.Warn("Failed to shutdown tracing", sdklog.String("error", err.Error()))
-			}
-		}()
-	}
+	// OpenTelemetry tracing initialization can be added here when zen-sdk/pkg/observability is available
+	// For now, continue without tracing
 
 	// Check for private key
 	if os.Getenv("ZEN_LOCK_PRIVATE_KEY") == "" {
