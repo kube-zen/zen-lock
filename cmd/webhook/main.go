@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -19,12 +19,14 @@ import (
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
 	"github.com/kube-zen/zen-sdk/pkg/leader"
+	sdklog 	"github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/zenlead"
 )
 
 var (
 	scheme                  = runtime.NewScheme()
-	setupLog                = ctrl.Log.WithName("setup")
+	logger                  *sdklog.Logger
+	setupLog                *sdklog.Logger
 	leaderElectionMode      = flag.String("leader-election-mode", "builtin", "Leader election mode: builtin (default), zenlead, or disabled (controller only)")
 	leaderElectionID        = flag.String("leader-election-id", "", "The ID for leader election (default: zen-lock-controller-leader-election). Required for builtin mode.")
 	leaderElectionLeaseName = flag.String("leader-election-lease-name", "", "The LeaderGroup CRD name (required for zenlead mode)")
@@ -51,17 +53,31 @@ func main() {
 	flag.BoolVar(&enableWebhook, "enable-webhook", true,
 		"Enable the mutating admission webhook. Leader election is disabled for webhook-only mode.")
 
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	// Initialize zen-sdk logger (configures controller-runtime logger automatically)
+	logger = sdklog.NewLogger("zen-lock")
+	setupLog = logger.WithComponent("setup")
+
+	// Initialize OpenTelemetry tracing using SDK
+	ctx := context.Background()
+	if shutdown, err := observability.InitWithDefaults(ctx, "zen-lock"); err != nil {
+		setupLog.Warn("OpenTelemetry tracer initialization failed, continuing without tracing",
+			sdklog.String("error", err.Error()),
+			sdklog.ErrorCode("OTEL_INIT_FAILED"),
+		)
+	} else {
+		setupLog.Info("OpenTelemetry tracing initialized")
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				setupLog.Warn("Failed to shutdown tracing", sdklog.String("error", err.Error()))
+			}
+		}()
+	}
 
 	// Check for private key
 	if os.Getenv("ZEN_LOCK_PRIVATE_KEY") == "" {
-		setupLog.Error(fmt.Errorf("ZEN_LOCK_PRIVATE_KEY not set"), "Private key environment variable is required")
+		setupLog.Error(fmt.Errorf("ZEN_LOCK_PRIVATE_KEY not set"), "Private key environment variable is required", sdklog.ErrorCode("MISSING_PRIVATE_KEY"))
 		os.Exit(1)
 	}
 
@@ -86,7 +102,7 @@ func main() {
 		// Get namespace (required for leader election)
 		namespace, err := leader.RequirePodNamespace()
 		if err != nil {
-			setupLog.Error(err, "failed to determine pod namespace (required when controller is enabled)")
+			setupLog.Error(err, "failed to determine pod namespace (required when controller is enabled)", sdklog.ErrorCode("NAMESPACE_ERROR"))
 			os.Exit(1)
 		}
 
@@ -111,10 +127,10 @@ func main() {
 				ElectionID: electionID,
 				Namespace:  namespace,
 			}
-			setupLog.Info("Leader election mode: builtin (Profile B)")
+			setupLog.Info("Leader election mode: builtin (Profile B)", sdklog.Operation("leader_election_config"))
 		case "zenlead":
 			if *leaderElectionLeaseName == "" {
-				setupLog.Error(fmt.Errorf("--leader-election-lease-name is required when --leader-election-mode=zenlead"), "invalid configuration")
+				setupLog.Error(fmt.Errorf("--leader-election-lease-name is required when --leader-election-mode=zenlead"), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"))
 				os.Exit(1)
 			}
 			leConfig = zenlead.LeaderElectionConfig{
@@ -122,21 +138,21 @@ func main() {
 				LeaseName: *leaderElectionLeaseName,
 				Namespace: namespace,
 			}
-			setupLog.Info("Leader election mode: zenlead managed (Profile C)", "leaseName", *leaderElectionLeaseName)
+			setupLog.Info("Leader election mode: zenlead managed (Profile C)", sdklog.Operation("leader_election_config"), sdklog.String("leaseName", *leaderElectionLeaseName))
 		case "disabled":
 			leConfig = zenlead.LeaderElectionConfig{
 				Mode: zenlead.Disabled,
 			}
-			setupLog.Info("Leader election disabled - single replica only (unsafe if replicas > 1)")
+			setupLog.Info("Leader election disabled - single replica only (unsafe if replicas > 1)", sdklog.Operation("leader_election_config"))
 		default:
-			setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin, zenlead, or disabled)", *leaderElectionMode), "invalid configuration")
+			setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin, zenlead, or disabled)", *leaderElectionMode), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"))
 			os.Exit(1)
 		}
 
 		// Prepare manager options with leader election
-		mgrOpts, err := zenlead.PrepareManagerOptions(baseOpts, leConfig)
+		mgrOpts, err := zenlead.PrepareManagerOptions(&baseOpts, &leConfig)
 		if err != nil {
-			setupLog.Error(err, "failed to prepare manager options")
+			setupLog.Error(err, "failed to prepare manager options", sdklog.ErrorCode("MANAGER_OPTIONS_ERROR"))
 			os.Exit(1)
 		}
 
@@ -150,17 +166,17 @@ func main() {
 
 		// Enforce safe HA configuration
 		if err := zenlead.EnforceSafeHA(replicaCount, mgrOpts.LeaderElection); err != nil {
-			setupLog.Error(err, "unsafe HA configuration")
+			setupLog.Error(err, "unsafe HA configuration", sdklog.ErrorCode("UNSAFE_HA_CONFIG"))
 			os.Exit(1)
 		}
 	} else if enableWebhook {
 		// Webhook-only mode: explicitly disable leader election (webhooks scale horizontally)
 		mgrOpts = baseOpts
 		mgrOpts.LeaderElection = false
-		setupLog.Info("Webhook-only mode: leader election disabled (webhooks scale horizontally)")
+		setupLog.Info("Webhook-only mode: leader election disabled (webhooks scale horizontally)", sdklog.Operation("config"))
 	} else {
 		// Neither enabled - this shouldn't happen, but handle gracefully
-		setupLog.Info("Neither controller nor webhook enabled")
+		setupLog.Info("Neither controller nor webhook enabled", sdklog.Operation("config"))
 		mgrOpts = baseOpts
 		mgrOpts.LeaderElection = false
 	}
@@ -176,7 +192,7 @@ func main() {
 
 	mgr, err := ctrl.NewManager(restCfg, mgrOpts)
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "unable to start manager", sdklog.ErrorCode("MANAGER_START_ERROR"))
 		os.Exit(1)
 	}
 
@@ -185,55 +201,55 @@ func main() {
 	if enableController {
 		zenlockReconciler, err := controller.NewZenLockReconciler(mgr.GetClient(), mgr.GetScheme())
 		if err != nil {
-			setupLog.Error(err, "unable to create ZenLock reconciler")
+			setupLog.Error(err, "unable to create ZenLock reconciler", sdklog.ErrorCode("RECONCILER_CREATE_ERROR"))
 			os.Exit(1)
 		}
 		if err := zenlockReconciler.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup ZenLock controller")
+			setupLog.Error(err, "unable to setup ZenLock controller", sdklog.ErrorCode("CONTROLLER_SETUP_ERROR"))
 			os.Exit(1)
 		}
 
 		// Setup Secret controller (sets OwnerReferences on webhook-created Secrets)
 		secretReconciler := controller.NewSecretReconciler(mgr.GetClient(), mgr.GetScheme())
 		if err := secretReconciler.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup Secret controller")
+			setupLog.Error(err, "unable to setup Secret controller", sdklog.ErrorCode("CONTROLLER_SETUP_ERROR"))
 			os.Exit(1)
 		}
-		setupLog.Info("Controller enabled")
+		setupLog.Info("Controller enabled", sdklog.Component("controller"))
 	} else {
-		setupLog.Info("Controller disabled")
+		setupLog.Info("Controller disabled", sdklog.Component("controller"))
 	}
 
 	// Setup webhook (if enabled)
 	if enableWebhook {
 		if err := webhookpkg.SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup webhook")
+			setupLog.Error(err, "unable to setup webhook", sdklog.ErrorCode("WEBHOOK_SETUP_ERROR"))
 			os.Exit(1)
 		}
-		setupLog.Info("Webhook enabled")
+		setupLog.Info("Webhook enabled", sdklog.Component("webhook"))
 	} else {
-		setupLog.Info("Webhook disabled")
+		setupLog.Info("Webhook disabled", sdklog.Component("webhook"))
 	}
 
 	// Ensure at least one component is enabled
 	if !enableController && !enableWebhook {
-		setupLog.Error(fmt.Errorf("at least one of --enable-controller or --enable-webhook must be true"), "invalid configuration")
+		setupLog.Error(fmt.Errorf("at least one of --enable-controller or --enable-webhook must be true"), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"))
 		os.Exit(1)
 	}
 
 	// Setup health checks
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error(err, "unable to set up health check", sdklog.ErrorCode("HEALTH_CHECK_ERROR"))
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		setupLog.Error(err, "unable to set up ready check", sdklog.ErrorCode("READY_CHECK_ERROR"))
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting manager", sdklog.Operation("start"))
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "problem running manager", sdklog.ErrorCode("MANAGER_RUN_ERROR"))
 		os.Exit(1)
 	}
 }
