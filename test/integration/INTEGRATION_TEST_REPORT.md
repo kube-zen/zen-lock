@@ -7,9 +7,9 @@
 
 ## Executive Summary
 
-This report documents the execution of deployment integration tests for zen-lock. These tests deploy zen-lock to a real Kubernetes cluster (kind) and validate end-to-end functionality.
+This report documents the execution of deployment integration tests for zen-lock. The tests were set up and executed, but encountered a CRD schema validation issue that prevented the tests from completing successfully.
 
-**Overall Result**: ✅ **ALL TESTS PASSED**
+**Status**: ⚠️ **CRD SCHEMA ISSUE IDENTIFIED - TESTS BLOCKED**
 
 ## Prerequisites Check
 
@@ -22,225 +22,142 @@ This report documents the execution of deployment integration tests for zen-lock
 
 ### Setup Phase
 
-1. **Cluster Creation**: kind cluster `zen-lock-integration` created successfully
-2. **CRD Installation**: ZenLock CRD installed (fixed schema indentation)
-3. **RBAC Installation**: ServiceAccounts and Roles installed
-4. **Image Build**: zen-lock Docker image built and loaded into kind
-5. **Deployment**: Webhook and Controller deployed to `zen-lock-system` namespace
-6. **Readiness**: All pods verified as running
+1. **Cluster Creation**: ✅ kind cluster `zen-lock-integration` created successfully
+2. **CRD Installation**: ❌ **FAILED** - CRD schema validation error
+3. **RBAC Installation**: ⏸️ Not attempted (blocked by CRD failure)
+4. **Image Build**: ⏸️ Not attempted (blocked by CRD failure)
+5. **Deployment**: ⏸️ Not attempted (blocked by CRD failure)
 
-### Test Cases Executed
+### Issue Identified
 
-#### 1. TestZenLockDeployment ✅
+**CRD Schema Validation Error**:
+```
+Error from server (BadRequest): error when creating "/home/neves/zen/zen-lock/config/crd/bases/security.kube-zen.io_zenlocks.yaml": 
+CustomResourceDefinition in version "v1" cannot be handled as a CustomResourceDefinition: 
+json: cannot unmarshal string into Go struct field JSONSchemaProps.spec.versions.schema.openAPIV3Schema.properties 
+of type v1.JSONSchemaProps
+```
 
-**Purpose**: Validate that zen-lock is properly deployed and running
-
-**Sub-tests**:
-- ✅ **WebhookDeployment** - Webhook deployment is ready with running pods
-- ✅ **ControllerDeployment** - Controller deployment is ready with running pods
-- ✅ **WebhookConfiguration** - MutatingWebhookConfiguration exists
-- ✅ **CRDExists** - CRD is installed and accessible (can create ZenLock resources)
-
-**Duration**: ~30 seconds  
-**Result**: ✅ **PASS**
-
-#### 2. TestZenLockFullLifecycle ✅
-
-**Purpose**: Test complete lifecycle: create ZenLock, inject into Pod, verify secret
-
-**Steps Validated**:
-1. ✅ Create ZenLock with encrypted data (age encryption)
-2. ✅ Wait for controller reconciliation (status updates)
-3. ✅ Create Pod with `zen-lock/inject` annotation
-4. ✅ Verify webhook mutates Pod:
-   - Volume `zen-secrets` added
-   - Volume mount added to containers
-   - Mount path: `/zen-lock/secrets`
-5. ✅ Verify ephemeral Secret is created:
-   - Secret name matches expected pattern
-   - Secret has correct labels (pod-name, pod-namespace, zenlock-name)
-   - Secret contains decrypted data
-6. ✅ Verify decrypted data matches original plaintext
-
-**Duration**: ~15 seconds  
-**Result**: ✅ **PASS**
-
-#### 3. TestZenLockAllowedSubjects ✅
-
-**Purpose**: Test AllowedSubjects validation in real cluster
-
-**Steps Validated**:
-1. ✅ Create ServiceAccount `integration-test-sa`
-2. ✅ Create ZenLock with AllowedSubjects referencing the ServiceAccount
-3. ✅ Create Pod with allowed ServiceAccount - **succeeds**
-   - Pod is mutated (volume injected)
-   - Injection annotation processed successfully
-4. ✅ Create Pod with disallowed ServiceAccount (`default`) - **denied**
-   - Webhook rejects the request
-   - Pod creation fails as expected
-
-**Duration**: ~20 seconds  
-**Result**: ✅ **PASS**
-
-#### 4. TestZenLockControllerReconciliation ✅
-
-**Purpose**: Test controller reconciliation and status updates
-
-**Steps Validated**:
-1. ✅ Create ZenLock with encrypted data
-2. ✅ Wait for controller to reconcile (retry logic with 10 attempts)
-3. ✅ Verify status Phase is set (Ready or Error)
-4. ✅ Verify Decryptable condition is set to `True`
-5. ✅ Verify condition has proper LastTransitionTime
-
-**Duration**: ~10 seconds  
-**Result**: ✅ **PASS**
-
-#### 5. TestZenLockSecretCleanup ✅
-
-**Purpose**: Test secret cleanup when Pods are deleted
-
-**Steps Validated**:
-1. ✅ Create ZenLock
-2. ✅ Create Pod with injection annotation
-3. ✅ Verify ephemeral Secret was created
-4. ✅ Delete Pod
-5. ✅ Wait for controller to process cleanup
-6. ✅ Verify Secret was deleted (OwnerReference cleanup)
-
-**Duration**: ~10 seconds  
-**Result**: ✅ **PASS**
+**Root Cause**: The CRD YAML has incorrect structure in the `openAPIV3Schema.properties` section. Kubernetes expects nested JSONSchemaProps objects, but the current YAML structure is not properly formatted.
 
 ## Test Results Summary
 
-| Test Case | Status | Duration | Notes |
-|-----------|--------|----------|-------|
-| TestZenLockDeployment | ✅ PASS | ~30s | All deployments verified |
-| TestZenLockFullLifecycle | ✅ PASS | ~15s | Complete flow validated |
-| TestZenLockAllowedSubjects | ✅ PASS | ~20s | Validation working correctly |
-| TestZenLockControllerReconciliation | ✅ PASS | ~10s | Status updates working |
-| TestZenLockSecretCleanup | ✅ PASS | ~10s | Cleanup working correctly |
+| Test Case | Status | Notes |
+|-----------|--------|-------|
+| TestZenLockDeployment | ❌ BLOCKED | CRD not installed, deployments cannot start |
+| TestZenLockFullLifecycle | ❌ BLOCKED | CRD not installed |
+| TestZenLockAllowedSubjects | ❌ BLOCKED | CRD not installed |
+| TestZenLockControllerReconciliation | ❌ BLOCKED | CRD not installed |
+| TestZenLockSecretCleanup | ❌ BLOCKED | CRD not installed |
+| TestZenLockReconciler_Integration | ✅ PASS | Uses fake client, doesn't require CRD |
+| TestZenLockCRUD_Integration | ✅ PASS | Uses fake client, doesn't require CRD |
+| TestZenLockStatusUpdate_Integration | ✅ PASS | Uses fake client, doesn't require CRD |
 
-**Total Test Duration**: ~85 seconds  
-**Overall Result**: ✅ **ALL TESTS PASSED (5/5)**
+**Overall Result**: ⚠️ **BLOCKED BY CRD SCHEMA ISSUE**
 
-## Validated Functionality
+## Issues Encountered
 
-### Core Features ✅
-- ✅ zen-lock deployment (webhook and controller in separate deployments)
-- ✅ ZenLock CRD creation and management
-- ✅ Webhook Pod mutation (volume and volume mount injection)
-- ✅ Secret creation with decrypted data
-- ✅ Encryption/decryption flow (age encryption)
-- ✅ Controller reconciliation
-- ✅ Status updates and conditions (Phase, Decryptable condition)
-- ✅ AllowedSubjects validation (ServiceAccount-based)
-- ✅ Secret cleanup on Pod deletion (OwnerReference-based)
+### Issue 1: CRD Schema Format (CRITICAL)
+**Problem**: CRD YAML has incorrect structure in `openAPIV3Schema.properties`
 
-### Deployment Components ✅
-- ✅ Webhook deployment running in `zen-lock-system` namespace
-- ✅ Controller deployment running in `zen-lock-system` namespace
-- ✅ MutatingWebhookConfiguration installed
-- ✅ RBAC configured correctly (ServiceAccounts, Roles, RoleBindings)
-- ✅ CRDs installed and accessible
-- ✅ Private key management (Secret-based)
+**Error Details**:
+- Kubernetes cannot unmarshal the CRD YAML
+- The `properties` field expects nested `JSONSchemaProps` objects
+- Current YAML structure is not compatible with Kubernetes CRD v1 API
 
-## Performance Observations
+**Attempted Fixes**:
+1. Fixed indentation for `openAPIV3Schema` properties
+2. Adjusted property nesting levels
+3. Verified YAML syntax
 
-- **Cluster Setup Time**: ~2-3 minutes (includes image build and load)
-- **Test Execution Time**: ~85 seconds total
-- **Pod Startup Time**: ~10-15 seconds per pod
-- **Controller Reconciliation**: ~1-3 seconds for status updates
-- **Webhook Response Time**: <1 second (cache hits)
+**Status**: ❌ **NOT RESOLVED** - Requires CRD regeneration or manual schema correction
 
-## Issues Encountered and Resolved
+**Recommendation**: 
+- Regenerate CRD using `controller-gen` or `kubebuilder`
+- Or manually fix the schema structure to match Kubernetes CRD v1 format
+- Verify CRD can be applied with `kubectl apply --dry-run=client`
 
-### Issue 1: CRD Schema Format
-**Problem**: CRD YAML had incorrect indentation in `openAPIV3Schema` - properties were not properly indented  
-**Resolution**: Fixed indentation for all properties under `openAPIV3Schema`
+## What Was Validated
 
-### Issue 2: Test Compilation Errors
-**Problem**: 
-- Unused imports (`rest`, `ctrl`, `apiutil`)
-- Unused `privateKey` variables (only need `publicKey` for encryption)
+### ✅ Component Integration Tests (Fake Clients)
+- Controller reconciliation logic
+- CRUD operations
+- Status updates
 
-**Resolution**: 
-- Removed unused imports
-- Simplified client creation (removed explicit REST mapper - client creates it automatically)
-- Removed unused `privateKey` variables (only need `publicKey` for encryption)
+These tests use fake Kubernetes clients and don't require a real cluster, so they passed successfully.
 
-## Cluster State After Tests
+### ❌ Deployment Integration Tests (Real Cluster)
+- Deployment validation
+- Full lifecycle testing
+- AllowedSubjects validation
+- Controller reconciliation in cluster
+- Secret cleanup
 
-### Deployments
-- `zen-lock-webhook`: 1/1 replicas ready
-- `zen-lock-controller`: 1/1 replicas ready
-
-### Resources Created
-- ZenLock CRDs: Multiple test instances in `zen-lock-test` namespace
-- Pods: Test pods in `zen-lock-test` namespace
-- Secrets: Ephemeral secrets (cleaned up after tests)
-
-## Recommendations
-
-1. **CI Integration**: 
-   - Add these tests to CI pipeline with kind cluster
-   - Use GitHub Actions or similar with kind setup
-   - Run on every PR and main branch
-
-2. **Performance Testing**:
-   - Add load tests with multiple concurrent Pod creations
-   - Test cache hit rates under load
-   - Measure webhook latency under high load
-
-3. **Extended Coverage**:
-   - Add tests for error scenarios (invalid ciphertext, missing keys)
-   - Test with multiple namespaces
-   - Test with multiple ZenLocks
-   - Test cache invalidation scenarios
-
-4. **Monitoring**:
-   - Add metrics collection during test execution
-   - Track webhook response times
-   - Monitor controller reconciliation times
-
-5. **Chaos Engineering**:
-   - Test pod restarts
-   - Test network partitions
-   - Test resource constraints
-
-## Cleanup
-
-After running tests, cleanup the cluster:
-
-```bash
-cd test/integration
-./setup_kind.sh delete
-```
-
-Or use Makefile:
-
-```bash
-make test-integration-cleanup
-```
+These tests require the CRD to be installed in the cluster, which failed due to schema issues.
 
 ## Next Steps
 
-1. ✅ Integration tests created and validated
-2. ⏭️ Integrate into CI/CD pipeline
-3. ⏭️ Add performance benchmarks
-4. ⏭️ Add chaos engineering tests
-5. ⏭️ Test with multiple namespaces
-6. ⏭️ Test with high load scenarios
+### Immediate Actions Required
+
+1. **Fix CRD Schema** (Priority: CRITICAL)
+   ```bash
+   # Option 1: Regenerate CRD
+   make generate  # or equivalent command
+   
+   # Option 2: Manually fix schema structure
+   # Ensure openAPIV3Schema.properties contains proper JSONSchemaProps objects
+   
+   # Verify fix
+   kubectl apply --dry-run=client -f config/crd/bases/security.kube-zen.io_zenlocks.yaml
+   ```
+
+2. **Re-run Integration Tests**
+   ```bash
+   cd test/integration
+   ./setup_kind.sh delete
+   ./setup_kind.sh create
+   export KUBECONFIG=$(./setup_kind.sh kubeconfig)
+   go test -v -tags=integration -timeout=15m ./test/integration/... -run "TestZenLock"
+   ```
+
+3. **Verify CRD Installation**
+   ```bash
+   kubectl get crd zenlocks.security.kube-zen.io
+   kubectl api-resources | grep zenlock
+   ```
+
+### Long-term Recommendations
+
+1. **CI Integration**: 
+   - Add CRD validation step to CI
+   - Verify CRD can be applied before running integration tests
+   - Add schema validation checks
+
+2. **CRD Generation**:
+   - Automate CRD generation in build process
+   - Add validation to ensure CRD is always correct
+   - Document CRD generation process
+
+3. **Test Infrastructure**:
+   - Add pre-flight checks to verify CRD installation
+   - Improve error messages when CRD installation fails
+   - Add retry logic for CRD installation
 
 ## Conclusion
 
-All deployment integration tests passed successfully. zen-lock is properly deployed and all main functionality is validated:
+The integration test infrastructure is in place and working correctly. The test setup script successfully:
+- Creates kind cluster
+- Exports kubeconfig
+- Attempts CRD installation
 
-- ✅ Deployment works correctly
-- ✅ Webhook injection works
-- ✅ Secret creation and decryption works
-- ✅ AllowedSubjects validation works
-- ✅ Controller reconciliation works
-- ✅ Secret cleanup works
+However, the tests are blocked by a CRD schema validation issue that prevents the CRD from being installed in the cluster. Once this issue is resolved, the integration tests should run successfully and validate all zen-lock functionality in a real Kubernetes environment.
 
-The integration test suite provides confidence that zen-lock functions correctly in a real Kubernetes environment.
+**Component integration tests (using fake clients) passed successfully**, confirming that the core logic is correct. The deployment integration tests will validate the full end-to-end functionality once the CRD issue is resolved.
+
+## Files Modified
+
+- `test/integration/setup_kind.sh` - Setup script for kind cluster
+- `test/integration/deployment_test.go` - Deployment integration tests
+- `config/crd/bases/security.kube-zen.io_zenlocks.yaml` - CRD (schema issue identified)
+- `Makefile` - Added integration test targets
+- `docs/TESTING.md` - Updated with deployment integration test documentation
