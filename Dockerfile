@@ -10,12 +10,31 @@ WORKDIR /build
 # Install build dependencies
 RUN apk add --no-cache git make
 
+# Copy zen-sdk first (needed for latest logging code)
+# Build context should be from parent directory (zen/)
+COPY zen-sdk /build/zen-sdk
+
+# Ensure zen-sdk dependencies are resolved
+WORKDIR /build/zen-sdk
+RUN go mod tidy && go mod download
+
+# Back to build directory
+WORKDIR /build
+
 # Copy go mod files first for better layer caching
-COPY go.mod go.sum ./
+COPY zen-lock/go.mod zen-lock/go.sum* ./
+
+# Download dependencies (may fail for zen-sdk if tag not available, that's OK)
+RUN go mod download || true
+
+# Add replace directive to use local zen-sdk during build
+RUN go mod edit -replace github.com/kube-zen/zen-sdk=./zen-sdk
+
+# Download dependencies with local replace (updates go.sum without removing requires)
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY zen-lock/ .
 
 # Build optimized binary
 # CGO_ENABLED=0: Static binary, no C dependencies
