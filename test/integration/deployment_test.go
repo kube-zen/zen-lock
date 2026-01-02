@@ -25,7 +25,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
