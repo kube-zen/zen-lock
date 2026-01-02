@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	filippo.io/age v1.3.1
-	github.com/kube-zen/zen-sdk v0.2.7-alpha.0.20260102213536-b63f7f2c3788
+	github.com/kube-zen/zen-sdk v0.2.8-alpha
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/yaml.v3 v3.0.1
