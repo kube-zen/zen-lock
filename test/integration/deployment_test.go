@@ -36,9 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -80,16 +78,9 @@ func setupKubernetesClient(t *testing.T) {
 		t.Fatalf("Failed to build config: %v", err)
 	}
 
-	// Create REST mapper
-	mapper, err := apiutil.NewDynamicRESTMapper(config)
-	if err != nil {
-		t.Fatalf("Failed to create REST mapper: %v", err)
-	}
-
-	// Create client
+	// Create client (REST mapper is created automatically)
 	k8sClient, err = client.New(config, client.Options{
 		Scheme: scheme,
-		Mapper: mapper,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
@@ -277,7 +268,7 @@ func TestZenLockFullLifecycle(t *testing.T) {
 	ctx := context.Background()
 	ensureNamespace(ctx, t)
 
-	privateKey, publicKey := generateTestKeys(t)
+	_, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-secret-value", publicKey)
 
 	// Create ZenLock
@@ -633,7 +624,7 @@ func TestZenLockSecretCleanup(t *testing.T) {
 	ctx := context.Background()
 	ensureNamespace(ctx, t)
 
-	privateKey, publicKey := generateTestKeys(t)
+	_, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-secret-value", publicKey)
 
 	// Create ZenLock
