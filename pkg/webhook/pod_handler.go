@@ -106,7 +106,7 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 }
 
 // handleDryRun handles dry-run mode by mutating the pod without creating secrets
-func (h *PodHandler) handleDryRun(ctx context.Context, pod *corev1.Pod, secretName, mountPath, injectName, namespace string, startTime time.Time) admission.Response {
+func (h *PodHandler) handleDryRun(ctx context.Context, pod *corev1.Pod, secretName, mountPath, injectName, namespace string, startTime time.Time, originalObject []byte) admission.Response {
 	mutatedPod := pod.DeepCopy()
 	if err := h.mutatePod(mutatedPod, secretName, mountPath); err != nil {
 		duration := time.Since(startTime).Seconds()
@@ -123,7 +123,7 @@ func (h *PodHandler) handleDryRun(ctx context.Context, pod *corev1.Pod, secretNa
 	}
 	duration := time.Since(startTime).Seconds()
 	metrics.RecordWebhookInjection(namespace, injectName, "success", duration)
-	return admission.PatchResponseFromRaw(nil, mutatedPodBytes)
+	return admission.PatchResponseFromRaw(originalObject, mutatedPodBytes)
 }
 
 // ensureSecretExists ensures the secret exists and is up-to-date, handling conflicts and stale data
@@ -310,7 +310,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	// Skip Secret creation/updates in dry-run mode (no side effects)
 	isDryRun := req.DryRun != nil && *req.DryRun
 	if isDryRun {
-		return h.handleDryRun(ctx, pod, secretName, mountPath, injectName, req.Namespace, startTime)
+		return h.handleDryRun(ctx, pod, secretName, mountPath, injectName, req.Namespace, startTime, req.Object.Raw)
 	}
 
 	// Create ephemeral Secret with labels (OwnerReference will be set by controller later)
@@ -341,11 +341,11 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	}
 
 	// Mutate Pod object and return response
-	return h.createMutationResponse(pod, secretName, mountPath, injectName, req.Namespace, startTime)
+	return h.createMutationResponse(pod, secretName, mountPath, injectName, req.Namespace, startTime, req.Object.Raw)
 }
 
 // createMutationResponse mutates the pod and creates the admission response
-func (h *PodHandler) createMutationResponse(pod *corev1.Pod, secretName, mountPath, injectName, namespace string, startTime time.Time) admission.Response {
+func (h *PodHandler) createMutationResponse(pod *corev1.Pod, secretName, mountPath, injectName, namespace string, startTime time.Time, originalObject []byte) admission.Response {
 	mutatedPod := pod.DeepCopy()
 	if err := h.mutatePod(mutatedPod, secretName, mountPath); err != nil {
 		duration := time.Since(startTime).Seconds()
@@ -364,7 +364,7 @@ func (h *PodHandler) createMutationResponse(pod *corev1.Pod, secretName, mountPa
 
 	duration := time.Since(startTime).Seconds()
 	metrics.RecordWebhookInjection(namespace, injectName, "success", duration)
-	return admission.PatchResponseFromRaw(nil, mutatedPodBytes)
+	return admission.PatchResponseFromRaw(originalObject, mutatedPodBytes)
 }
 
 // mutatePod mutates the Pod object in-memory to add volume and volume mounts
