@@ -120,7 +120,7 @@ func TestSecretReconciler_Reconcile_UpdateSecretError(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after successful update")
 	}
 }
@@ -146,7 +146,7 @@ func TestSecretReconciler_Reconcile_SecretNotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error for not found", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for not found")
 	}
 }
@@ -190,7 +190,7 @@ func TestSecretReconciler_Reconcile_OrphanedSecretDeleteError(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after deleting orphaned secret")
 	}
 
@@ -239,7 +239,7 @@ func TestSecretReconciler_Reconcile_MissingPodNamespaceLabel(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for non-zen-lock secrets")
 	}
 }
@@ -280,7 +280,7 @@ func TestSecretReconciler_Reconcile_MissingPodNameLabel(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for non-zen-lock secrets")
 	}
 }

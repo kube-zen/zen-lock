@@ -74,7 +74,7 @@ func TestSecretReconciler_IgnoresNonZenLockSecrets(t *testing.T) {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
 
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for non-zen-lock secrets")
 	}
 }
@@ -129,7 +129,7 @@ func TestSecretReconciler_SetsOwnerReferenceWhenPodExists(t *testing.T) {
 		t.Errorf("Reconcile() error = %v", err)
 	}
 
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue when OwnerReference is set")
 	}
 
@@ -248,7 +248,7 @@ func TestSecretReconciler_DeletesOrphanedSecret(t *testing.T) {
 	}
 
 	// Should not requeue when deleting orphaned secret
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue when deleting orphaned secret")
 	}
 
@@ -381,7 +381,7 @@ func TestSecretReconciler_SkipsWhenOwnerReferenceExists(t *testing.T) {
 		t.Errorf("Reconcile() error = %v", err)
 	}
 
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue when OwnerReference already exists")
 	}
 

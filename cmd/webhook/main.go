@@ -10,13 +10,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
+	"github.com/kube-zen/zen-sdk/pkg/health"
 	"github.com/kube-zen/zen-sdk/pkg/leader"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/zenlead"
@@ -226,13 +226,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup health checks
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	// Setup health checks using zen-sdk/pkg/health
+	// Check if Manager's cache is synced (controller-runtime provides cache for ZenLock and Secret informers)
+	informerChecker := health.NewInformerSyncChecker(func() map[string]func() bool {
+		cache := mgr.GetCache()
+		return map[string]func() bool{
+			"cache": func() bool {
+				// Check if cache is synced (WaitForCacheSync returns true if all caches synced)
+				syncCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				defer cancel()
+				synced := cache.WaitForCacheSync(syncCtx)
+				// synced is a map[string]bool - check if all are true
+				for _, v := range synced {
+					if !v {
+						return false
+					}
+				}
+				return true
+			},
+		}
+	})
+
+	if err := mgr.AddHealthzCheck("informer-sync", informerChecker.LivenessCheck); err != nil {
 		setupLog.Error(err, "unable to set up health check", sdklog.ErrorCode("HEALTH_CHECK_ERROR"))
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("informer-sync", informerChecker.ReadinessCheck); err != nil {
 		setupLog.Error(err, "unable to set up ready check", sdklog.ErrorCode("READY_CHECK_ERROR"))
+		os.Exit(1)
+	}
+	if err := mgr.AddHealthzCheck("startup", informerChecker.StartupCheck); err != nil {
+		setupLog.Error(err, "unable to set up startup check", sdklog.ErrorCode("STARTUP_CHECK_ERROR"))
 		os.Exit(1)
 	}
 

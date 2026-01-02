@@ -163,7 +163,7 @@ func TestWebhookSecretReconcilerFlow_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SecretReconciler.Reconcile() error = %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Expected SecretReconciler to not requeue when Pod exists")
 	}
 
@@ -232,7 +232,7 @@ func TestSecretReconciler_OrphanCleanup_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SecretReconciler.Reconcile() error = %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Expected SecretReconciler to not requeue when deleting orphan")
 	}
 
@@ -788,7 +788,7 @@ func TestSecretReconciler_RequeueWhenPodNotReady_Integration(t *testing.T) {
 	}
 
 	// Should requeue when Pod doesn't exist but Secret is new
-	if !result.Requeue && result.RequeueAfter == 0 {
+	if result.RequeueAfter == 0 {
 		t.Error("Expected SecretReconciler to requeue when Pod not found and Secret is new")
 	}
 

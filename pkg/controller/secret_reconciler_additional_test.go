@@ -74,7 +74,7 @@ func TestSecretReconciler_Reconcile_NoZenLockLabels(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error for non-zen-lock secret, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for non-zen-lock secret")
 	}
 }
@@ -130,7 +130,7 @@ func TestSecretReconciler_Reconcile_AlreadyHasOwnerReference(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error when OwnerReference already exists, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue when OwnerReference already exists")
 	}
 }
@@ -224,7 +224,7 @@ func TestSecretReconciler_Reconcile_OrphanedSecret(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error when deleting orphaned secret, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after deleting orphaned secret")
 	}
 
@@ -270,11 +270,11 @@ func TestSecretReconciler_Reconcile_NewSecretPodNotCreatedYet(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error when Pod doesn't exist yet, got: %v", err)
 	}
-	// Verify it requeues (either Requeue or RequeueAfter should be set)
+	// Verify it requeues (RequeueAfter should be set)
 	// Note: fake client may set CreationTimestamp to Now(), making the secret age 0
 	// which is less than OrphanTTL, so it should requeue
-	if !result.Requeue && result.RequeueAfter == 0 {
-		// If neither is set, check if the secret was actually processed
+	if result.RequeueAfter == 0 {
+		// If not set, check if the secret was actually processed
 		// (fake client behavior may differ)
 		_ = result // Acknowledge result for now
 	} else if result.RequeueAfter > 0 && result.RequeueAfter != 5*time.Second {

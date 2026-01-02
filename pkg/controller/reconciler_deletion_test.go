@@ -113,7 +113,7 @@ func TestZenLockReconciler_Reconcile_Deletion(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error for deletion, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after successful deletion")
 	}
 
@@ -194,7 +194,7 @@ func TestZenLockReconciler_Reconcile_Deletion_NoFinalizer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error when no finalizer, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue when no finalizer")
 	}
 }

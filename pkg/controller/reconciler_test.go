@@ -112,7 +112,7 @@ func TestZenLockReconciler_Reconcile_ValidZenLock(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error for valid ZenLock, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for valid ZenLock")
 	}
 

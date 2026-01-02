@@ -57,7 +57,7 @@ func TestZenLockReconciler_Reconcile_FinalizerAdditionError(t *testing.T) {
 	ctx := context.Background()
 	result, err := reconciler.Reconcile(ctx, req)
 
-	// Should requeue on first reconcile (finalizer addition)
+	// Should requeue on first reconcile (finalizer addition) with RequeueAfter: 0
 	// If Update fails, it should return error
 	// Note: fake client doesn't fail on Update, so this tests the happy path
 	if err != nil {

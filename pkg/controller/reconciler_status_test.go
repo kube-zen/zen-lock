@@ -306,7 +306,7 @@ func TestZenLockReconciler_HandleDeletion_SecretListError(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after successful deletion")
 	}
 }
@@ -357,7 +357,7 @@ func TestZenLockReconciler_HandleDeletion_DeleteSecretError(t *testing.T) {
 		t.Errorf("Reconcile() error = %v, want no error (should continue on secret delete error)", err)
 	}
 	// Should complete deletion and remove finalizer
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after deletion cleanup")
 	}
 }

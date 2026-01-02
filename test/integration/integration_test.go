@@ -115,8 +115,8 @@ func TestZenLockReconciler_Integration(t *testing.T) {
 		t.Errorf("Reconcile() error = %v", err)
 	}
 
-	// First reconcile may requeue due to finalizer addition
-	if result.Requeue {
+	// First reconcile may requeue due to finalizer addition (RequeueAfter: 0 means immediate requeue)
+	if result.RequeueAfter == 0 {
 		// Simulate second reconcile after finalizer is added
 		result, err = reconciler.Reconcile(ctx, req)
 		if err != nil {
@@ -125,7 +125,7 @@ func TestZenLockReconciler_Integration(t *testing.T) {
 		}
 	}
 
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after finalizer is added")
 	}
 
