@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 // RateLimiter implements token bucket rate limiting for webhook requests
@@ -159,7 +159,8 @@ func (rl *RateLimiter) RateLimitMiddleware(next func(http.ResponseWriter, *http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		key := getClientIP(r)
 		if !rl.Allow(key) {
-			klog.V(2).InfoS("Rate limit exceeded", "client_ip", key, "path", r.URL.Path)
+			logger := sdklog.NewLogger("zen-lock-webhook")
+			logger.Info("Rate limit exceeded", sdklog.Operation("rate_limit"), sdklog.String("client_ip", key), sdklog.String("path", r.URL.Path))
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
