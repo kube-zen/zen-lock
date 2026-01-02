@@ -95,6 +95,9 @@ install_crds() {
 
 install_rbac() {
     log_info "Installing RBAC..."
+    # Create namespace first (required for ServiceAccounts)
+    kubectl create namespace zen-lock-system --kubeconfig="$KUBECONFIG_PATH" --dry-run=client -o yaml | \
+        kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f -
     kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f "$PROJECT_ROOT/config/rbac/"
     log_info "RBAC installed"
 }
