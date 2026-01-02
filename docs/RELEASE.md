@@ -38,7 +38,7 @@ We follow [Semantic Versioning](https://semver.org/):
 ### Charts (helm-charts)
 - Tag: Chart version (e.g., `v0.0.2-alpha`)
 - Artifact: Helm chart package
-- Matrix: See `docs/RELEASE_VERSION_MATRIX.md` for canonical mapping
+- Version compatibility: See [CHANGELOG.md](../CHANGELOG.md) for version history
 
 ## Pre-Release Checklist
 

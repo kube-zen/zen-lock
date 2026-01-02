@@ -169,8 +169,6 @@ helm install zen-lock zen-lock/zen-lock \
 - **GitHub Pages**: https://kube-zen.github.io/zen-lock
 - **Artifact Hub**: https://artifacthub.io/packages/helm/zen-lock/zen-lock
 
-See [Helm Repository Documentation](docs/HELM_REPOSITORY.md) for details.
-
 ## Configuration
 
 The controller needs access to the Private Key to decrypt secrets.
