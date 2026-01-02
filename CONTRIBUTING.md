@@ -6,7 +6,7 @@ Thank you for your interest in contributing to zen-lock! This document provides 
 
 ### Prerequisites
 
-- Go 1.24 or later
+- Go 1.25 or later
 - Kubernetes cluster (for testing)
 - kubectl configured
 - Docker (for building images)
