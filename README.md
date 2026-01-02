@@ -260,6 +260,16 @@ make build-controller
 make build-image
 ```
 
+### Go 1.25 Optimizations
+
+zen-lock is optimized for Go 1.25 with:
+- Pre-allocated maps and slices with known capacity
+- Container-aware GOMAXPROCS (automatic in Kubernetes)
+- Optimized cache cleanup loops
+- Efficient memory allocation patterns
+
+See [Go 1.25 Optimizations](docs/GO_1_25_OPTIMIZATIONS.md) for details.
+
 ### Running Locally
 
 ```bash

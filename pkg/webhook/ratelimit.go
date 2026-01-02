@@ -92,16 +92,23 @@ func (rl *RateLimiter) Allow(key string) bool {
 }
 
 // cleanup removes old entries to prevent memory leaks
+// Optimized for Go 1.25: collect expired keys first, then delete in batch
 func (rl *RateLimiter) cleanup() {
 	for {
 		select {
 		case <-rl.cleanupTick.C:
 			rl.mu.Lock()
 			now := time.Now()
+			// Collect expired keys first (more efficient than deleting during iteration)
+			expiredKeys := make([]string, 0)
 			for key, bucket := range rl.tokens {
 				if now.Sub(bucket.lastRefill) > 24*time.Hour {
-					delete(rl.tokens, key)
+					expiredKeys = append(expiredKeys, key)
 				}
+			}
+			// Delete expired entries in batch
+			for _, key := range expiredKeys {
+				delete(rl.tokens, key)
 			}
 			rl.mu.Unlock()
 		case <-rl.stopCh:
