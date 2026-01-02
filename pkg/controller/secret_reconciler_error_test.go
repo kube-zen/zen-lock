@@ -212,7 +212,7 @@ func TestSecretReconciler_Reconcile_MissingPodNamespaceLabel(t *testing.T) {
 			Name:      "zen-lock-secret",
 			Namespace: "default",
 			Labels: map[string]string{
-				common.LabelPodName:     "test-pod",
+				common.LabelPodName: "test-pod",
 				// Missing LabelPodNamespace
 				common.LabelZenLockName: "test-zenlock",
 			},
@@ -255,7 +255,7 @@ func TestSecretReconciler_Reconcile_MissingPodNameLabel(t *testing.T) {
 			Labels: map[string]string{
 				// Missing LabelPodName
 				common.LabelPodNamespace: "default",
-				common.LabelZenLockName:   "test-zenlock",
+				common.LabelZenLockName:  "test-zenlock",
 			},
 		},
 		Data: map[string][]byte{
@@ -284,4 +284,3 @@ func TestSecretReconciler_Reconcile_MissingPodNameLabel(t *testing.T) {
 		t.Error("Reconcile() should not requeue for non-zen-lock secrets")
 	}
 }
-

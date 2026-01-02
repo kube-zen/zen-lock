@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -232,17 +234,11 @@ func main() {
 		cache := mgr.GetCache()
 		return map[string]func() bool{
 			"cache": func() bool {
-				// Check if cache is synced (WaitForCacheSync returns true if all caches synced)
+				// Check if cache is synced
 				syncCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 				defer cancel()
-				synced := cache.WaitForCacheSync(syncCtx)
-				// synced is a map[string]bool - check if all are true
-				for _, v := range synced {
-					if !v {
-						return false
-					}
-				}
-				return true
+				// WaitForCacheSync returns true if all caches are synced
+				return cache.WaitForCacheSync(syncCtx)
 			},
 		}
 	})

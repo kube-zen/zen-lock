@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	corev1 "k8s.io/api/core/v1"
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/common"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestZenLockReconciler_UpdateStatus_NewCondition(t *testing.T) {
@@ -361,4 +361,3 @@ func TestZenLockReconciler_HandleDeletion_DeleteSecretError(t *testing.T) {
 		t.Error("Reconcile() should not requeue after deletion cleanup")
 	}
 }
-
