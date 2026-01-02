@@ -25,3 +25,8 @@ Have you considered any alternative solutions or features?
 ## Additional Context
 
 Add any other context, examples, or screenshots about the feature request here.
+
+## KEP Relevance
+
+If this relates to a KEP or design document, please reference the relevant section.
+

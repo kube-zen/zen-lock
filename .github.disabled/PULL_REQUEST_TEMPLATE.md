@@ -1,3 +1,17 @@
+# Copyright 2025 Kube-ZEN Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 ## Description
 
 Brief description of changes
@@ -29,7 +43,7 @@ How was this tested?
 - [ ] Documentation updated
 - [ ] No new warnings generated
 - [ ] Tests added/updated and passing
-- [ ] Coverage maintained (>65%)
+- [ ] Coverage maintained (>75%)
 - [ ] CHANGELOG.md updated (if applicable)
 
 ## Related Issues
@@ -44,3 +58,4 @@ Add screenshots to help explain your changes.
 ## Additional Notes
 
 Any additional information that reviewers should know.
+

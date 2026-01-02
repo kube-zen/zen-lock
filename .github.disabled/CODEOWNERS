@@ -18,14 +18,14 @@
 # Default owners for everything in the repo
 * @kube-zen/maintainers
 
-# Core code
+# Core controller code
 /pkg/ @kube-zen/maintainers
 /cmd/ @kube-zen/maintainers
 
-# CRD definitions (if exists)
-/deploy/crds/ @kube-zen/maintainers
+# CRD definitions
+/config/crd/ @kube-zen/maintainers
 
-# Helm chart (if exists)
+# Helm chart
 /charts/ @kube-zen/maintainers
 
 # Documentation
@@ -39,6 +39,7 @@
 # Build and deployment
 /Makefile @kube-zen/maintainers
 /Dockerfile @kube-zen/maintainers
+/install.sh @kube-zen/maintainers
 
 # Dependencies
 /go.mod @kube-zen/maintainers
@@ -46,3 +47,4 @@
 
 # Examples
 /examples/ @kube-zen/maintainers
+

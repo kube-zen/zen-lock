@@ -34,7 +34,7 @@ A clear and concise description of what actually happened.
 ## Configuration
 
 ```yaml
-# Paste your configuration here
+# Paste your ZenLock configuration here
 ```
 
 ## Logs
@@ -50,3 +50,4 @@ Add any other context about the problem here.
 ## Possible Solution
 
 If you have suggestions on how to fix the bug, please describe them here.
+
