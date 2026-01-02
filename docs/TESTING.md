@@ -51,11 +51,14 @@ Coverage is checked automatically in CI and will fail if below 40% minimum thres
 
 ## Integration Tests
 
-Integration tests are located in `test/integration/` and test component interactions using fake Kubernetes clients.
+Integration tests are located in `test/integration/` and come in two types:
 
-### Test Coverage
+1. **Component Integration Tests**: Test component interactions using fake Kubernetes clients
+2. **Deployment Integration Tests**: Test actual deployment of zen-lock to a Kubernetes cluster (kind)
 
-Integration tests cover:
+### Component Integration Tests
+
+These tests use fake clients and test component interactions:
 
 - ✅ Controller startup and reconciliation
 - ✅ ZenLock CRUD operations
@@ -65,15 +68,67 @@ Integration tests cover:
 - ✅ Ephemeral secret cleanup with OwnerReferences
 - ✅ AllowedSubjects validation
 
-### Running Integration Tests
-
+**Running Component Integration Tests:**
 ```bash
-# Run all integration tests
+# Run all component integration tests
 make test-integration
 
 # Run specific integration test
 go test -v ./test/integration/... -run TestZenLockCRUD
 ```
+
+### Deployment Integration Tests
+
+These tests deploy zen-lock to a real Kubernetes cluster (kind) and validate end-to-end functionality:
+
+- ✅ zen-lock deployment (webhook and controller)
+- ✅ Full lifecycle: create ZenLock, inject into Pod, verify secret
+- ✅ AllowedSubjects validation in real cluster
+- ✅ Controller reconciliation
+- ✅ Secret cleanup when Pods are deleted
+
+**Prerequisites:**
+- `kind` installed
+- `kubectl` installed
+- `docker` or `podman` installed
+
+**Quick Start:**
+```bash
+# Setup test cluster and deploy zen-lock
+make test-integration-setup
+
+# Export kubeconfig
+export KUBECONFIG=$(cd test/integration && ./setup_kind.sh kubeconfig)
+
+# Run deployment integration tests
+make test-integration-deploy
+
+# Cleanup
+make test-integration-cleanup
+```
+
+**Manual Setup:**
+```bash
+# Create cluster and deploy zen-lock
+cd test/integration
+./setup_kind.sh create
+
+# Export kubeconfig
+export KUBECONFIG=$(./setup_kind.sh kubeconfig)
+
+# Run tests
+go test -v -tags=integration -timeout=10m ./test/integration/... -run TestZenLockDeployment
+
+# Cleanup
+./setup_kind.sh delete
+```
+
+**Test Coverage:**
+- `TestZenLockDeployment` - Validates zen-lock is deployed and running
+- `TestZenLockFullLifecycle` - Tests complete lifecycle: create ZenLock, inject into Pod, verify secret
+- `TestZenLockAllowedSubjects` - Tests AllowedSubjects validation in real cluster
+- `TestZenLockControllerReconciliation` - Tests controller reconciliation
+- `TestZenLockSecretCleanup` - Tests secret cleanup when Pods are deleted
 
 ## E2E Tests
 

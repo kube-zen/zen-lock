@@ -63,10 +63,32 @@ test-unit:
 	@echo "Running unit tests..."
 	go test -v -race -coverprofile=coverage.out -covermode=atomic -timeout=10m ./pkg/...
 
-# Run integration tests
+# Run integration tests (with fake clients)
 test-integration:
 	@echo "Running integration tests..."
-	go test -v -timeout=5m ./test/integration/...
+	go test -v -timeout=5m ./test/integration/... -tags=integration
+
+# Run deployment integration tests (requires kind cluster)
+# Usage: make test-integration-deploy CLUSTER_NAME=zen-lock-integration
+test-integration-deploy:
+	@echo "Running deployment integration tests..."
+	@if [ -z "$$KUBECONFIG" ] && [ ! -f "$$HOME/.kube/zen-lock-integration-config" ]; then \
+		echo "⚠️  KUBECONFIG not set. Setting up test cluster..."; \
+		cd test/integration && ./setup_kind.sh create; \
+		export KUBECONFIG=$$HOME/.kube/zen-lock-integration-config; \
+	fi
+	@export KUBECONFIG=$${KUBECONFIG:-$$HOME/.kube/zen-lock-integration-config}; \
+	go test -v -tags=integration -timeout=10m ./test/integration/... -run TestZenLockDeployment
+
+# Setup integration test cluster with kind
+test-integration-setup:
+	@echo "Setting up integration test cluster..."
+	@cd test/integration && ./setup_kind.sh create
+
+# Cleanup integration test cluster
+test-integration-cleanup:
+	@echo "Cleaning up integration test cluster..."
+	@cd test/integration && ./setup_kind.sh delete
 
 # Run E2E tests (requires kubebuilder binaries)
 # Install kubebuilder: https://kubebuilder.io/docs/getting-started/installation/
