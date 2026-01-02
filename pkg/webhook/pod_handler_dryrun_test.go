@@ -150,7 +150,8 @@ func TestPodHandler_HandleDryRun_MarshalError(t *testing.T) {
 	response := handler.handleDryRun(ctx, pod, "test-secret", "/zen-lock/secrets", "test-zenlock", "default", time.Now(), originalObject)
 
 	// Should return a response (either success or error)
-	if response == (admission.Response{}) {
+	// admission.Response contains slices which can't be compared with ==
+	if response.UID == "" && len(response.Patches) == 0 && !response.Allowed {
 		t.Error("Expected a response from handleDryRun")
 	}
 }
