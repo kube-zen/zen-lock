@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +63,7 @@ func TestZenLockReconciler_Reconcile_DecryptionFailure(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after decryption failure")
 	}
 
@@ -79,46 +78,8 @@ func TestZenLockReconciler_Reconcile_DecryptionFailure(t *testing.T) {
 	}
 }
 
-func TestZenLockReconciler_Reconcile_SuccessfulDecryption(t *testing.T) {
-	reconciler, clientBuilder := setupTestReconciler(t)
-
-	// Note: This test requires actual encrypted data with the test private key
-	// For now, we'll test the structure - actual decryption is tested in integration tests
-	zenlock := &securityv1alpha1.ZenLock{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-zenlock",
-			Namespace: "default",
-			Finalizers: []string{"zenlocks.security.kube-zen.io/finalizer"},
-		},
-		Spec: securityv1alpha1.ZenLockSpec{
-			EncryptedData: map[string]string{
-				"key": "encrypted-value",
-			},
-		},
-	}
-
-	client := clientBuilder.WithObjects(zenlock).WithStatusSubresource(zenlock).Build()
-	reconciler.Client = client
-
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "test-zenlock",
-			Namespace: "default",
-		},
-	}
-
-	ctx := context.Background()
-	// This will attempt decryption - may fail with invalid data, but tests the path
-	result, err := reconciler.Reconcile(ctx, req)
-
-	// Should handle gracefully
-	if err != nil {
-		t.Errorf("Reconcile() error = %v, want no error", err)
-	}
-	if result.Requeue {
-		t.Error("Reconcile() should not requeue after processing")
-	}
-}
+// TestZenLockReconciler_Reconcile_SuccessfulDecryption is defined in reconciler_coverage_test.go
+// This test file focuses on decryption failure scenarios
 
 func TestZenLockReconciler_Reconcile_UpdateFinalizerError(t *testing.T) {
 	reconciler, clientBuilder := setupTestReconciler(t)

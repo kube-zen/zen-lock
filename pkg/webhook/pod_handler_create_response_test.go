@@ -73,8 +73,9 @@ func TestPodHandler_CreateMutationResponse_MutateError(t *testing.T) {
 
 	// Should handle error gracefully
 	// Note: Empty pod spec might not actually error, but tests the path
-	if response == (admission.Response{}) {
-		t.Error("Expected a response from createMutationResponse")
+	// admission.Response contains slices which can't be compared with ==
+	if response.UID == "" && len(response.Patches) == 0 && !response.Allowed {
+		t.Error("Expected a valid response from createMutationResponse")
 	}
 }
 
@@ -98,8 +99,9 @@ func TestPodHandler_CreateMutationResponse_MarshalError(t *testing.T) {
 	response := handler.createMutationResponse(pod, "test-secret", "/zen-lock/secrets", "test-zenlock", "default", time.Now(), originalObject)
 
 	// Should return a response (either success or error)
-	if response == (admission.Response{}) {
-		t.Error("Expected a response from createMutationResponse")
+	// admission.Response contains slices which can't be compared with ==
+	if response.UID == "" && len(response.Patches) == 0 && !response.Allowed {
+		t.Error("Expected a valid response from createMutationResponse")
 	}
 }
 
