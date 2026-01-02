@@ -73,12 +73,18 @@ jobs:
       - name: Build
         run: |
           mkdir -p bin
-          go build -o bin/zen-lock ./cmd/zen-lock
+          go build -ldflags="-s -w" -trimpath -o bin/zen-lock ./cmd/cli
+          go build -ldflags="-s -w" -trimpath -o bin/zen-lock-webhook ./cmd/webhook
       
-      - name: Verify binary
+      - name: Verify binaries
         run: |
           if [ ! -f bin/zen-lock ]; then
-            echo "Binary not found"
+            echo "zen-lock binary not found"
+            exit 1
+          fi
+          if [ ! -f bin/zen-lock-webhook ]; then
+            echo "zen-lock-webhook binary not found"
             exit 1
           fi
           file bin/zen-lock
+          file bin/zen-lock-webhook

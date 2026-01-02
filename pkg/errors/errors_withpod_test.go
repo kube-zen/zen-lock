@@ -29,16 +29,16 @@ func TestWithPod_RegularError(t *testing.T) {
 	regularErr := errors.New("regular error")
 	podErr := WithPod(regularErr, "pod-ns", "pod-name")
 
-	if podErr.PodNamespace != "pod-ns" {
-		t.Errorf("Expected PodNamespace to be 'pod-ns', got %v", podErr.PodNamespace)
+	if podErr.GetContext("pod_namespace") != "pod-ns" {
+		t.Errorf("Expected pod_namespace to be 'pod-ns', got %v", podErr.GetContext("pod_namespace"))
 	}
-	if podErr.PodName != "pod-name" {
-		t.Errorf("Expected PodName to be 'pod-name', got %v", podErr.PodName)
+	if podErr.GetContext("pod_name") != "pod-name" {
+		t.Errorf("Expected pod_name to be 'pod-name', got %v", podErr.GetContext("pod_name"))
 	}
 	if podErr.Message != "regular error" {
 		t.Errorf("Expected Message to be 'regular error', got %v", podErr.Message)
 	}
-	if podErr.Err != regularErr {
+	if podErr.Unwrap() != regularErr {
 		t.Errorf("Expected Err to be the original error")
 	}
 }
@@ -50,17 +50,17 @@ func TestWithPod_WithExistingZenLockContext(t *testing.T) {
 	podErr := WithPod(zenlockErr, "pod-ns", "pod-name")
 
 	// Should preserve ZenLock context
-	if podErr.ZenLockNamespace != "zenlock-ns" {
-		t.Errorf("Expected ZenLockNamespace to be preserved: got %v, want zenlock-ns", podErr.ZenLockNamespace)
+	if podErr.GetContext("zenlock_namespace") != "zenlock-ns" {
+		t.Errorf("Expected zenlock_namespace to be preserved: got %v, want zenlock-ns", podErr.GetContext("zenlock_namespace"))
 	}
-	if podErr.ZenLockName != "zenlock-name" {
-		t.Errorf("Expected ZenLockName to be preserved: got %v, want zenlock-name", podErr.ZenLockName)
+	if podErr.GetContext("zenlock_name") != "zenlock-name" {
+		t.Errorf("Expected zenlock_name to be preserved: got %v, want zenlock-name", podErr.GetContext("zenlock_name"))
 	}
 	// Should add Pod context
-	if podErr.PodNamespace != "pod-ns" {
-		t.Errorf("Expected PodNamespace = %v, want pod-ns", podErr.PodNamespace)
+	if podErr.GetContext("pod_namespace") != "pod-ns" {
+		t.Errorf("Expected pod_namespace = %v, want pod-ns", podErr.GetContext("pod_namespace"))
 	}
-	if podErr.PodName != "pod-name" {
-		t.Errorf("Expected PodName = %v, want pod-name", podErr.PodName)
+	if podErr.GetContext("pod_name") != "pod-name" {
+		t.Errorf("Expected pod_name = %v, want pod-name", podErr.GetContext("pod_name"))
 	}
 }

@@ -58,7 +58,7 @@ kubectl exec $POD_NAME -- cat /etc/config/DB_USER
 ## Notes
 
 - The `zen-lock/inject` annotation tells the webhook which ZenLock to inject
-- The `zen-lock/mount-path` annotation is optional (defaults to `/zen-secrets`)
+- The `zen-lock/mount-path` annotation is optional (defaults to `/zen-lock/secrets`)
 - The volume name must be `zen-secrets` (fixed name used by the webhook)
 - Secrets are automatically cleaned up when the Pod is deleted (via OwnerReference)
 

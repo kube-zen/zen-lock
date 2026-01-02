@@ -29,6 +29,7 @@ import (
 	"filippo.io/age"
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
+	"github.com/kube-zen/zen-sdk/pkg/lifecycle"
 )
 
 func TestZenLockReconciler_Reconcile_SuccessfulDecryption(t *testing.T) {
@@ -91,7 +92,7 @@ func TestZenLockReconciler_Reconcile_SuccessfulDecryption(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error for valid encrypted data, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue after successful decryption")
 	}
 
@@ -132,8 +133,9 @@ func TestZenLockReconciler_Reconcile_FinalizerAddition(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error when adding finalizer, got: %v", err)
 	}
-	if !result.Requeue {
-		t.Error("Reconcile() should requeue after adding finalizer")
+	// RequeueAfter: 0 means immediate requeue, which is correct for finalizer addition
+	if result.RequeueAfter != 0 {
+		t.Errorf("Reconcile() should return RequeueAfter: 0 for immediate requeue, got: %v", result.RequeueAfter)
 	}
 
 	// Verify finalizer was added
@@ -142,7 +144,7 @@ func TestZenLockReconciler_Reconcile_FinalizerAddition(t *testing.T) {
 		t.Fatalf("Failed to get updated ZenLock: %v", err)
 	}
 
-	if !containsString(updatedZenLock.Finalizers, zenLockFinalizer) {
+	if !lifecycle.ContainsString(updatedZenLock.Finalizers, zenLockFinalizer) {
 		t.Error("Expected finalizer to be added")
 	}
 }

@@ -250,7 +250,7 @@ spec:
 The webhook automatically:
 1. Decrypts the secret
 2. Creates an ephemeral Secret
-3. Mounts it to `/zen-secrets` by default
+3. Mounts it to `/zen-lock/secrets` by default
 
 ### Custom Mount Path
 
@@ -268,8 +268,8 @@ Secrets are mounted as files in the specified directory:
 
 ```bash
 # In your container
-cat /zen-secrets/DB_USER
-cat /zen-secrets/DB_PASS
+cat /zen-lock/secrets/DB_USER
+cat /zen-lock/secrets/DB_PASS
 ```
 
 Or use as environment variables (if your app supports it):

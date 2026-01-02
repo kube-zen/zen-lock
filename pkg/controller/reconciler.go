@@ -15,17 +15,20 @@ import (
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/common"
+	"github.com/kube-zen/zen-lock/pkg/config"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 	"github.com/kube-zen/zen-lock/pkg/webhook"
+	"github.com/kube-zen/zen-sdk/pkg/lifecycle"
 	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
 // ZenLockReconciler reconciles a ZenLock object
 type ZenLockReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	crypto crypto.Encryptor
+	Scheme     *runtime.Scheme
+	crypto     crypto.Encryptor
+	privateKey string // Cached private key to avoid repeated env lookups
 }
 
 // NewZenLockReconciler creates a new ZenLockReconciler
@@ -41,9 +44,10 @@ func NewZenLockReconciler(client client.Client, scheme *runtime.Scheme) (*ZenLoc
 	encryptor := crypto.NewAgeEncryptor()
 
 	return &ZenLockReconciler{
-		Client: client,
-		Scheme: scheme,
-		crypto: encryptor,
+		Client:     client,
+		Scheme:     scheme,
+		crypto:     encryptor,
+		privateKey: privateKey,
 	}, nil
 }
 
@@ -71,34 +75,37 @@ func (r *ZenLockReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Handle deletion
-	if !zenlock.DeletionTimestamp.IsZero() {
+	if lifecycle.IsDeleting(zenlock) {
 		return r.handleDeletion(ctx, zenlock, logger, startTime, req)
 	}
 
 	// Add finalizer if not present
-	if !containsString(zenlock.Finalizers, zenLockFinalizer) {
-		zenlock.Finalizers = append(zenlock.Finalizers, zenLockFinalizer)
+	if lifecycle.AddFinalizer(zenlock, zenLockFinalizer) {
 		if err := r.Update(ctx, zenlock); err != nil {
 			logger.Error(err, "Failed to add finalizer")
 			return ctrl.Result{}, err
 		}
-		// Requeue to continue reconciliation
-		return ctrl.Result{Requeue: true}, nil
+		// Requeue to continue reconciliation (immediate requeue)
+		return ctrl.Result{RequeueAfter: 0}, nil
 	}
 
-	// Load private key
-	privateKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
-	if privateKey == "" {
-		logger.Error(fmt.Errorf("ZEN_LOCK_PRIVATE_KEY not set"), "Cannot decrypt ZenLock")
-		r.updateStatus(ctx, zenlock, "Error", "KeyNotFound", "Private key not configured")
-		duration := time.Since(startTime).Seconds()
-		metrics.RecordReconcile(req.Namespace, req.Name, "error", duration)
-		return ctrl.Result{}, nil
+	// Use cached private key, but check if it's still valid (allows for runtime key updates)
+	if r.privateKey == "" {
+		// Try to reload from environment (allows for key restoration)
+		r.privateKey = os.Getenv("ZEN_LOCK_PRIVATE_KEY")
+		if r.privateKey == "" {
+			logger.Error(fmt.Errorf("ZEN_LOCK_PRIVATE_KEY not set"), "Cannot decrypt ZenLock")
+			r.updateStatus(ctx, zenlock, "Error", "KeyNotFound", "Private key not configured")
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordReconcile(req.Namespace, req.Name, "error", duration)
+			// Requeue with delay to allow for key restoration
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
 	}
 
 	// Try to decrypt to verify the secret is valid
 	decryptStart := time.Now()
-	_, err := r.crypto.DecryptMap(zenlock.Spec.EncryptedData, privateKey)
+	_, err := r.crypto.DecryptMap(zenlock.Spec.EncryptedData, r.privateKey)
 	decryptDuration := time.Since(decryptStart).Seconds()
 	if err != nil {
 		logger.Error(err, "Failed to decrypt ZenLock", "name", zenlock.Name)
@@ -130,7 +137,7 @@ func (r *ZenLockReconciler) handleDeletion(ctx context.Context, zenlock *securit
 	Info(string, ...interface{})
 	Error(error, string, ...interface{})
 }, startTime time.Time, req ctrl.Request) (ctrl.Result, error) {
-	if !containsString(zenlock.Finalizers, zenLockFinalizer) {
+	if !lifecycle.HasFinalizer(zenlock, zenLockFinalizer) {
 		// Finalizer already removed, nothing to do
 		return ctrl.Result{}, nil
 	}
@@ -159,8 +166,7 @@ func (r *ZenLockReconciler) handleDeletion(ctx context.Context, zenlock *securit
 	}
 
 	// Remove finalizer
-	zenlock.Finalizers = removeString(zenlock.Finalizers, zenLockFinalizer)
-	if err := r.Update(ctx, zenlock); err != nil {
+	if err := lifecycle.RemoveFinalizerAndUpdate(ctx, r.Client, zenlock, zenLockFinalizer); err != nil {
 		logger.Error(err, "Failed to remove finalizer")
 		return ctrl.Result{}, err
 	}
@@ -171,25 +177,6 @@ func (r *ZenLockReconciler) handleDeletion(ctx context.Context, zenlock *securit
 	return ctrl.Result{}, nil
 }
 
-// Helper functions for finalizer management
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func removeString(slice []string, s string) []string {
-	var result []string
-	for _, item := range slice {
-		if item != s {
-			result = append(result, item)
-		}
-	}
-	return result
-}
 
 // updateStatus updates the ZenLock status
 func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv1alpha1.ZenLock, phase, reason, message string) {
@@ -236,9 +223,9 @@ func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv
 
 	// Retry status update with exponential backoff for transient errors
 	retryConfig := retry.DefaultConfig()
-	retryConfig.MaxAttempts = 3
-	retryConfig.InitialDelay = 100 * time.Millisecond
-	retryConfig.MaxDelay = 2 * time.Second
+	retryConfig.MaxAttempts = config.DefaultRetryMaxAttempts
+	retryConfig.InitialDelay = config.DefaultRetryInitialDelay
+	retryConfig.MaxDelay = config.DefaultRetryMaxDelay
 
 	if err := retry.Do(ctx, retryConfig, func() error {
 		return r.Status().Update(ctx, zenlock)

@@ -34,6 +34,7 @@ import (
 
 	"filippo.io/age"
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/config"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
 
@@ -67,7 +68,7 @@ func TestPodHandler_Handle_ContextTimeout(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -155,8 +156,8 @@ func TestPodHandler_Handle_CacheMiss(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject:    "test-zenlock",
-				annotationMountPath: "/zen-lock/secrets",
+				config.AnnotationInject:    "test-zenlock",
+				config.AnnotationMountPath: "/zen-lock/secrets",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -192,8 +193,8 @@ func TestPodHandler_Handle_InvalidMountPath_Coverage(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject:    "test-zenlock",
-				annotationMountPath: "../invalid/path", // Invalid relative path
+				config.AnnotationInject:    "test-zenlock",
+				config.AnnotationMountPath: "../invalid/path", // Invalid relative path
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -277,8 +278,8 @@ func TestPodHandler_Handle_DefaultMountPath(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
-				// No annotationMountPath - should use default
+				config.AnnotationInject: "test-zenlock",
+				// No config.AnnotationMountPath - should use default
 			},
 		},
 		Spec: corev1.PodSpec{

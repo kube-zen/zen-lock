@@ -66,7 +66,7 @@ annotations:
 ```
 
 #### `zen-lock/mount-path`
-**Optional**: Custom mount path for secrets (default: `/zen-secrets`)
+**Optional**: Custom mount path for secrets (default: `/zen-lock/secrets`)
 
 ```yaml
 annotations:

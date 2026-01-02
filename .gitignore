@@ -37,6 +37,15 @@ Thumbs.db
 private-key*
 *.key
 
+# Security: Never commit credentials or tokens
+**/dockerhub*.txt
+**/*credential*.txt
+**/*token*.txt
+**/*password*.txt
+**/*secret*.txt
+**/.env
+**/.env.local
+
 # Build artifacts
 .helm-packages/
 *.tgz
@@ -46,4 +55,6 @@ private-key*
 /zen-lock-webhook
 /webhook
 /controller
+main
+cli
 

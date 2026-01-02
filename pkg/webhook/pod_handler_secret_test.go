@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/config"
 	"github.com/kube-zen/zen-lock/pkg/common"
 )
 
@@ -72,7 +73,7 @@ func TestPodHandler_Handle_SecretAlreadyExists_Stale(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -140,7 +141,7 @@ func TestPodHandler_Handle_SecretAlreadyExists_Matching(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -191,7 +192,7 @@ func TestPodHandler_Handle_SecretCreateError(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{

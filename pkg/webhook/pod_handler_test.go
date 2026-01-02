@@ -191,7 +191,7 @@ func TestMutatePod(t *testing.T) {
 				},
 			},
 			secretName: "test-secret",
-			mountPath:  "/zen-secrets",
+			mountPath:  "/zen-lock/secrets",
 			wantErr:    false,
 		},
 		{
@@ -213,7 +213,7 @@ func TestMutatePod(t *testing.T) {
 				},
 			},
 			secretName: "test-secret",
-			mountPath:  "/zen-secrets",
+			mountPath:  "/zen-lock/secrets",
 			wantErr:    false,
 		},
 		{
@@ -229,7 +229,7 @@ func TestMutatePod(t *testing.T) {
 				},
 			},
 			secretName: "test-secret",
-			mountPath:  "/zen-secrets",
+			mountPath:  "/zen-lock/secrets",
 			wantErr:    false,
 		},
 	}
@@ -428,7 +428,7 @@ func TestPodHandler_Handle_MultipleContainers(t *testing.T) {
 		},
 	}
 
-	err := handler.mutatePod(pod, "test-secret", "/zen-secrets")
+	err := handler.mutatePod(pod, "test-secret", "/zen-lock/secrets")
 	if err != nil {
 		t.Fatalf("mutatePod() error = %v", err)
 	}

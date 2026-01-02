@@ -396,7 +396,7 @@
         "id": 15,
         "title": "Algorithm Usage Distribution",
         "type": "piechart",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
         "targets": [
           {
             "expr": "sum(rate(zenlock_algorithm_usage_total[5m])) by (algorithm)",
@@ -416,7 +416,7 @@
         "id": 16,
         "title": "Algorithm Usage Over Time",
         "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
         "targets": [
           {
             "expr": "sum(rate(zenlock_algorithm_usage_total{operation=\"encrypt\"}[5m])) by (algorithm)",
@@ -443,7 +443,7 @@
         "id": 17,
         "title": "Algorithm Errors",
         "type": "graph",
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 56},
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 64},
         "targets": [
           {
             "expr": "sum(rate(zenlock_algorithm_errors_total{reason=\"unsupported\"}[5m])) by (algorithm)",
@@ -465,6 +465,107 @@
           {
             "format": "ops",
             "label": "Errors/sec"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Cache Size",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 36},
+        "targets": [
+          {
+            "expr": "zenlock_cache_size",
+            "legendFormat": "Cache Size",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 100, "color": "yellow"},
+                {"value": 500, "color": "orange"},
+                {"value": 1000, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 19,
+        "title": "Cache Hit Rate (Gauge)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 36},
+        "targets": [
+          {
+            "expr": "zenlock_cache_hit_rate",
+            "legendFormat": "Cache Hit Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 0.5, "color": "yellow"},
+                {"value": 0.8, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 20,
+        "title": "Cache Size Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "zenlock_cache_size",
+            "legendFormat": "Cache Size",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Entries"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "Cache Hit Rate Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+        "targets": [
+          {
+            "expr": "zenlock_cache_hit_rate",
+            "legendFormat": "Cache Hit Rate",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "label": "Hit Rate",
+            "min": 0,
+            "max": 1
           },
           {
             "format": "short"

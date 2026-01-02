@@ -21,6 +21,7 @@ import (
 	"time"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -32,6 +33,9 @@ type ZenLockCache struct {
 	ttl        time.Duration
 	cleanupInt time.Duration
 	stopCh     chan struct{}
+	hits       int64         // Cache hit counter
+	misses     int64         // Cache miss counter
+	metricsCh  chan struct{} // Channel to trigger metrics update
 }
 
 type cacheEntry struct {
@@ -47,10 +51,14 @@ func NewZenLockCache(ttl time.Duration) *ZenLockCache {
 		ttl:        ttl,
 		cleanupInt: ttl / 2, // Cleanup every half TTL
 		stopCh:     make(chan struct{}),
+		metricsCh:  make(chan struct{}, 1), // Buffered channel for metrics updates
 	}
 
 	// Start background cleanup goroutine
 	go cache.cleanup()
+
+	// Start background metrics update goroutine
+	go cache.updateMetricsLoop()
 
 	return cache
 }
@@ -65,6 +73,7 @@ func (c *ZenLockCache) Get(key types.NamespacedName) (*securityv1alpha1.ZenLock,
 	entry, exists := c.cache[key]
 	if !exists {
 		c.mu.RUnlock()
+		c.recordMiss()
 		return nil, false
 	}
 
@@ -72,6 +81,7 @@ func (c *ZenLockCache) Get(key types.NamespacedName) (*securityv1alpha1.ZenLock,
 	now := time.Now()
 	if now.After(entry.expiresAt) {
 		c.mu.RUnlock()
+		c.recordMiss()
 		return nil, false
 	}
 	c.mu.RUnlock()
@@ -83,6 +93,7 @@ func (c *ZenLockCache) Get(key types.NamespacedName) (*securityv1alpha1.ZenLock,
 	}
 	c.mu.Unlock()
 
+	c.recordHit()
 	return entry.zenlock.DeepCopy(), true
 }
 
@@ -151,4 +162,62 @@ func (c *ZenLockCache) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.cache)
+}
+
+// recordHit increments the hit counter and triggers metrics update
+func (c *ZenLockCache) recordHit() {
+	c.mu.Lock()
+	c.hits++
+	c.mu.Unlock()
+	// Trigger metrics update (non-blocking)
+	select {
+	case c.metricsCh <- struct{}{}:
+	default:
+		// Channel full, skip this update
+	}
+}
+
+// recordMiss increments the miss counter and triggers metrics update
+func (c *ZenLockCache) recordMiss() {
+	c.mu.Lock()
+	c.misses++
+	c.mu.Unlock()
+	// Trigger metrics update (non-blocking)
+	select {
+	case c.metricsCh <- struct{}{}:
+	default:
+		// Channel full, skip this update
+	}
+}
+
+// updateMetricsLoop periodically updates cache metrics
+func (c *ZenLockCache) updateMetricsLoop() {
+	ticker := time.NewTicker(30 * time.Second) // Update metrics every 30 seconds
+	defer ticker.Stop()
+
+	// Update immediately on first run
+	c.updateMetrics()
+
+	for {
+		select {
+		case <-ticker.C:
+			c.updateMetrics()
+		case <-c.metricsCh:
+			// Triggered by hit/miss, but we'll update on next ticker to avoid excessive updates
+			// The ticker will handle the actual update
+		case <-c.stopCh:
+			return
+		}
+	}
+}
+
+// updateMetrics updates the cache size and hit rate metrics
+func (c *ZenLockCache) updateMetrics() {
+	c.mu.RLock()
+	size := len(c.cache)
+	hits := c.hits
+	misses := c.misses
+	c.mu.RUnlock()
+
+	metrics.UpdateCacheMetrics(size, hits, misses)
 }

@@ -137,12 +137,50 @@ zenlock_cache_hits_total{namespace="default",zenlock_name="app-secrets"} 450
 zenlock_cache_misses_total{namespace="default",zenlock_name="app-secrets"} 50
 ```
 
-**Cache Hit Rate**:
+**Cache Hit Rate** (calculated):
 ```promql
 sum(rate(zenlock_cache_hits_total[5m])) 
 / 
 (sum(rate(zenlock_cache_hits_total[5m])) + sum(rate(zenlock_cache_misses_total[5m]))) * 100
 ```
+
+---
+
+### `zenlock_cache_size`
+**Type**: Gauge  
+**Description**: Current number of entries in the ZenLock cache  
+**Labels**: None (global gauge)
+
+**Example**:
+```
+zenlock_cache_size 42
+```
+
+**Use Cases**:
+- Monitor cache memory usage
+- Alert when cache size exceeds thresholds
+- Track cache growth patterns
+
+**Note**: This metric is updated periodically by the cache manager.
+
+---
+
+### `zenlock_cache_hit_rate`
+**Type**: Gauge  
+**Description**: Current cache hit rate (hits / (hits + misses)) as a ratio (0.0 to 1.0)  
+**Labels**: None (global gauge)
+
+**Example**:
+```
+zenlock_cache_hit_rate 0.85
+```
+
+**Use Cases**:
+- Monitor cache effectiveness
+- Alert when hit rate drops below threshold
+- Track cache performance over time
+
+**Note**: This metric is updated periodically by the cache manager. A value of 0.85 means 85% hit rate.
 
 ---
 

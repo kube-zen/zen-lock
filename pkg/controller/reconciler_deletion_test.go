@@ -29,6 +29,7 @@ import (
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/common"
+	"github.com/kube-zen/zen-sdk/pkg/lifecycle"
 )
 
 func TestZenLockReconciler_Reconcile_Deletion(t *testing.T) {
@@ -138,7 +139,7 @@ func TestZenLockReconciler_Reconcile_Deletion(t *testing.T) {
 	err = client.Get(ctx, req.NamespacedName, updatedZenLock)
 	if err == nil {
 		// If ZenLock still exists, verify finalizer is removed
-		if containsString(updatedZenLock.Finalizers, zenLockFinalizer) {
+		if lifecycle.ContainsString(updatedZenLock.Finalizers, zenLockFinalizer) {
 			t.Error("Expected finalizer to be removed")
 		}
 	}
@@ -257,7 +258,7 @@ func TestRemoveString(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := removeString(tc.slice, tc.s)
+			result := lifecycle.RemoveString(tc.slice, tc.s)
 			if len(result) != len(tc.expected) {
 				t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
 				return

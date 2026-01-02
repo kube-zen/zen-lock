@@ -15,104 +15,44 @@ limitations under the License.
 */
 
 // Package errors provides structured error types for zen-lock with context.
+// This package now uses zen-sdk/pkg/errors as the base implementation.
 package errors
 
 import (
-	"errors"
-	"fmt"
+	sdkerrors "github.com/kube-zen/zen-sdk/pkg/errors"
 )
 
-// ZenLockError represents a zen-lock error with context.
-type ZenLockError struct {
-	// Type categorizes the error (e.g., "decryption_failed", "validation_failed", "webhook_failed")
-	Type string
-
-	// ZenLockNamespace is the namespace of the ZenLock (if applicable)
-	ZenLockNamespace string
-
-	// ZenLockName is the name of the ZenLock (if applicable)
-	ZenLockName string
-
-	// PodNamespace is the namespace of the Pod (if applicable)
-	PodNamespace string
-
-	// PodName is the name of the Pod (if applicable)
-	PodName string
-
-	// Message is the error message
-	Message string
-
-	// Err is the underlying error
-	Err error
-}
-
-// Error implements the error interface.
-func (e *ZenLockError) Error() string {
-	if e.Err != nil {
-		return fmt.Sprintf("%s: %v", e.Message, e.Err)
-	}
-	return e.Message
-}
-
-// Unwrap returns the underlying error.
-func (e *ZenLockError) Unwrap() error {
-	return e.Err
-}
+// ZenLockError is an alias for zen-sdk's ContextError.
+// This maintains backward compatibility while using the shared implementation.
+type ZenLockError = sdkerrors.ContextError
 
 // WithZenLock adds ZenLock context to an error.
 func WithZenLock(err error, namespace, name string) *ZenLockError {
-	var zlerr *ZenLockError
-	if errors.As(err, &zlerr) && zlerr != nil {
-		zlerr.ZenLockNamespace = namespace
-		zlerr.ZenLockName = name
-		return zlerr
-	}
-	return &ZenLockError{
-		Message:          err.Error(),
-		Err:              err,
-		ZenLockNamespace: namespace,
-		ZenLockName:      name,
-	}
+	return sdkerrors.WithMultipleContext(err, map[string]string{
+		"zenlock_namespace": namespace,
+		"zenlock_name":      name,
+	})
 }
 
 // WithPod adds Pod context to an error.
 func WithPod(err error, namespace, name string) *ZenLockError {
-	var zlerr *ZenLockError
-	if errors.As(err, &zlerr) && zlerr != nil {
-		zlerr.PodNamespace = namespace
-		zlerr.PodName = name
-		return zlerr
-	}
-	return &ZenLockError{
-		Message:      err.Error(),
-		Err:          err,
-		PodNamespace: namespace,
-		PodName:      name,
-	}
+	return sdkerrors.WithMultipleContext(err, map[string]string{
+		"pod_namespace": namespace,
+		"pod_name":      name,
+	})
 }
 
 // New creates a new ZenLockError.
 func New(errType, message string) *ZenLockError {
-	return &ZenLockError{
-		Type:    errType,
-		Message: message,
-	}
+	return sdkerrors.New(errType, message)
 }
 
 // Wrap wraps an error with a message and type.
 func Wrap(err error, errType, message string) *ZenLockError {
-	return &ZenLockError{
-		Type:    errType,
-		Message: message,
-		Err:     err,
-	}
+	return sdkerrors.Wrap(err, errType, message)
 }
 
 // Wrapf wraps an error with a formatted message and type.
 func Wrapf(err error, errType, format string, args ...interface{}) *ZenLockError {
-	return &ZenLockError{
-		Type:    errType,
-		Message: fmt.Sprintf(format, args...),
-		Err:     err,
-	}
+	return sdkerrors.Wrapf(err, errType, format, args...)
 }

@@ -27,18 +27,18 @@ func TestWithPod_PreservesExistingZenLockError(t *testing.T) {
 	err2 := WithPod(err1, "pod-namespace", "pod-name")
 
 	// Should preserve ZenLock context
-	if err2.ZenLockNamespace != "zenlock-namespace" {
-		t.Errorf("ZenLockNamespace should be preserved: got %v, want zenlock-namespace", err2.ZenLockNamespace)
+	if err2.GetContext("zenlock_namespace") != "zenlock-namespace" {
+		t.Errorf("zenlock_namespace should be preserved: got %v, want zenlock-namespace", err2.GetContext("zenlock_namespace"))
 	}
-	if err2.ZenLockName != "zenlock-name" {
-		t.Errorf("ZenLockName should be preserved: got %v, want zenlock-name", err2.ZenLockName)
+	if err2.GetContext("zenlock_name") != "zenlock-name" {
+		t.Errorf("zenlock_name should be preserved: got %v, want zenlock-name", err2.GetContext("zenlock_name"))
 	}
 	// Should add Pod context
-	if err2.PodNamespace != "pod-namespace" {
-		t.Errorf("PodNamespace = %v, want pod-namespace", err2.PodNamespace)
+	if err2.GetContext("pod_namespace") != "pod-namespace" {
+		t.Errorf("pod_namespace = %v, want pod-namespace", err2.GetContext("pod_namespace"))
 	}
-	if err2.PodName != "pod-name" {
-		t.Errorf("PodName = %v, want pod-name", err2.PodName)
+	if err2.GetContext("pod_name") != "pod-name" {
+		t.Errorf("pod_name = %v, want pod-name", err2.GetContext("pod_name"))
 	}
 }
 
@@ -49,10 +49,10 @@ func TestWithPod_WithNilError(t *testing.T) {
 	err := WithPod(nilErr, "namespace", "name")
 
 	// Should still create an error with Pod context
-	if err.PodNamespace != "namespace" {
-		t.Errorf("PodNamespace = %v, want namespace", err.PodNamespace)
+	if err.GetContext("pod_namespace") != "namespace" {
+		t.Errorf("pod_namespace = %v, want namespace", err.GetContext("pod_namespace"))
 	}
-	if err.PodName != "name" {
-		t.Errorf("PodName = %v, want name", err.PodName)
+	if err.GetContext("pod_name") != "name" {
+		t.Errorf("pod_name = %v, want name", err.GetContext("pod_name"))
 	}
 }

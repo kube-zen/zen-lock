@@ -7,6 +7,9 @@ import (
 	"io"
 
 	"filippo.io/age"
+
+	"github.com/kube-zen/zen-lock/pkg/config"
+	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 )
 
 // AgeEncryptor implements Encryptor using age encryption
@@ -37,16 +40,22 @@ func (a *AgeEncryptor) Encrypt(plaintext []byte, recipients []string) ([]byte, e
 	var encrypted bytes.Buffer
 	w, err := age.Encrypt(&encrypted, ageRecipients...)
 	if err != nil {
+		metrics.RecordAlgorithmError(config.DefaultAlgorithm, "encryption_failed")
 		return nil, fmt.Errorf("failed to create encrypt writer: %w", err)
 	}
 
 	if _, err := w.Write(plaintext); err != nil {
+		metrics.RecordAlgorithmError(config.DefaultAlgorithm, "encryption_failed")
 		return nil, fmt.Errorf("failed to write plaintext: %w", err)
 	}
 
 	if err := w.Close(); err != nil {
+		metrics.RecordAlgorithmError(config.DefaultAlgorithm, "encryption_failed")
 		return nil, fmt.Errorf("failed to close encrypt writer: %w", err)
 	}
+
+	// Record successful encryption
+	metrics.RecordAlgorithmUsage(config.DefaultAlgorithm, "encrypt")
 
 	return encrypted.Bytes(), nil
 }
@@ -66,13 +75,18 @@ func (a *AgeEncryptor) Decrypt(ciphertext []byte, identity string) ([]byte, erro
 	// Decrypt the data
 	r, err := age.Decrypt(bytes.NewReader(ciphertext), id)
 	if err != nil {
+		metrics.RecordAlgorithmError(config.DefaultAlgorithm, "decryption_failed")
 		return nil, fmt.Errorf("failed to create decrypt reader: %w", err)
 	}
 
 	decrypted, err := io.ReadAll(r)
 	if err != nil {
+		metrics.RecordAlgorithmError(config.DefaultAlgorithm, "decryption_failed")
 		return nil, fmt.Errorf("failed to read decrypted data: %w", err)
 	}
+
+	// Record successful decryption
+	metrics.RecordAlgorithmUsage(config.DefaultAlgorithm, "decrypt")
 
 	return decrypted, nil
 }

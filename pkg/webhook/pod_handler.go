@@ -21,19 +21,10 @@ import (
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/common"
+	"github.com/kube-zen/zen-lock/pkg/config"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 	"github.com/kube-zen/zen-sdk/pkg/retry"
-)
-
-const (
-	// Annotation keys
-	annotationInject    = "zen-lock/inject"
-	annotationMountPath = "zen-lock/mount-path"
-
-	// Default values
-	defaultMountPath  = "/zen-lock/secrets"
-	defaultVolumeName = "zen-secrets"
 )
 
 // GenerateSecretName generates a stable secret name from namespace and pod name
@@ -86,7 +77,7 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 	// Initialize crypto
 	encryptor := crypto.NewAgeEncryptor()
 
-	// Initialize cache with 5 minute TTL (configurable via env in future)
+	// Initialize cache with 5 minute TTL (configurable via ZEN_LOCK_CACHE_TTL env var)
 	cacheTTL := 5 * time.Minute
 	if ttlStr := os.Getenv("ZEN_LOCK_CACHE_TTL"); ttlStr != "" {
 		if parsedTTL, err := time.ParseDuration(ttlStr); err == nil {
@@ -203,8 +194,14 @@ func (h *PodHandler) secretDataMatches(existing, expected map[string][]byte) boo
 
 // Handle processes admission requests
 func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	// Add timeout to context
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	// Add timeout to context (configurable via ZEN_LOCK_WEBHOOK_TIMEOUT env var)
+	webhookTimeout := config.DefaultWebhookTimeout
+	if timeoutStr := os.Getenv("ZEN_LOCK_WEBHOOK_TIMEOUT"); timeoutStr != "" {
+		if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
+			webhookTimeout = parsedTimeout
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, webhookTimeout)
 	defer cancel()
 
 	startTime := time.Now()
@@ -220,7 +217,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	// No need to check leader status here - zen-lead blocks non-leader Pod creation at the API level
 
 	// Check if injection is requested
-	injectName := pod.GetAnnotations()[annotationInject]
+	injectName := pod.GetAnnotations()[config.AnnotationInject]
 	if injectName == "" {
 		return admission.Allowed("no zen-lock injection requested")
 	}
@@ -234,9 +231,9 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	}
 
 	// Get mount path from annotation or use default
-	mountPath := pod.GetAnnotations()[annotationMountPath]
+	mountPath := pod.GetAnnotations()[config.AnnotationMountPath]
 	if mountPath == "" {
-		mountPath = defaultMountPath
+		mountPath = config.DefaultMountPath
 	} else {
 		// Validate mount path if provided
 		if err := ValidateMountPath(mountPath); err != nil {
@@ -330,9 +327,9 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 
 	// Ensure secret exists and is up-to-date
 	retryConfig := retry.DefaultConfig()
-	retryConfig.MaxAttempts = 3
-	retryConfig.InitialDelay = 50 * time.Millisecond
-	retryConfig.MaxDelay = 1 * time.Second
+	retryConfig.MaxAttempts = config.DefaultRetryMaxAttempts
+	retryConfig.InitialDelay = config.DefaultWebhookRetryInitialDelay
+	retryConfig.MaxDelay = config.DefaultWebhookRetryMaxDelay
 
 	if err := h.ensureSecretExists(ctx, secret, secretName, injectName, req.Namespace, pod.Name, secretData, startTime, retryConfig, isDryRun); err != nil {
 		duration := time.Since(startTime).Seconds()
@@ -373,7 +370,7 @@ func (h *PodHandler) mutatePod(pod *corev1.Pod, secretName, mountPath string) er
 	// Check if volume already exists
 	volumeExists := false
 	for _, vol := range pod.Spec.Volumes {
-		if vol.Name == defaultVolumeName {
+		if vol.Name == config.DefaultVolumeName {
 			volumeExists = true
 			break
 		}
@@ -382,7 +379,7 @@ func (h *PodHandler) mutatePod(pod *corev1.Pod, secretName, mountPath string) er
 	// Add volume to pod spec if it doesn't exist
 	if !volumeExists {
 		volume := corev1.Volume{
-			Name: defaultVolumeName,
+			Name: config.DefaultVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: secretName,
@@ -397,14 +394,14 @@ func (h *PodHandler) mutatePod(pod *corev1.Pod, secretName, mountPath string) er
 		// Check if mount already exists
 		mountExists := false
 		for _, mount := range pod.Spec.Containers[i].VolumeMounts {
-			if mount.Name == defaultVolumeName {
+			if mount.Name == config.DefaultVolumeName {
 				mountExists = true
 				break
 			}
 		}
 		if !mountExists {
 			volumeMount := corev1.VolumeMount{
-				Name:      defaultVolumeName,
+				Name:      config.DefaultVolumeName,
 				MountPath: mountPath,
 				ReadOnly:  true,
 			}
@@ -417,14 +414,14 @@ func (h *PodHandler) mutatePod(pod *corev1.Pod, secretName, mountPath string) er
 		// Check if mount already exists
 		mountExists := false
 		for _, mount := range pod.Spec.InitContainers[i].VolumeMounts {
-			if mount.Name == defaultVolumeName {
+			if mount.Name == config.DefaultVolumeName {
 				mountExists = true
 				break
 			}
 		}
 		if !mountExists {
 			volumeMount := corev1.VolumeMount{
-				Name:      defaultVolumeName,
+				Name:      config.DefaultVolumeName,
 				MountPath: mountPath,
 				ReadOnly:  true,
 			}

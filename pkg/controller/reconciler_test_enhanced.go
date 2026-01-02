@@ -102,7 +102,7 @@ func TestZenLockReconciler_Reconcile_NoPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error when private key is missing (status updated instead), got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue when private key is missing")
 	}
 
@@ -152,7 +152,7 @@ func TestZenLockReconciler_Reconcile_DecryptionFailed(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error on decryption failure (status updated instead), got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue on decryption failure")
 	}
 

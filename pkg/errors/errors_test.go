@@ -29,19 +29,12 @@ func TestZenLockError_Error(t *testing.T) {
 	}{
 		{
 			name: "error with message only",
-			err: &ZenLockError{
-				Type:    "test_error",
-				Message: "test message",
-			},
+			err:  New("test_error", "test message"),
 			wantErr: "test message",
 		},
 		{
 			name: "error with underlying error",
-			err: &ZenLockError{
-				Type:    "test_error",
-				Message: "test message",
-				Err:     errors.New("underlying error"),
-			},
+			err:  Wrap(errors.New("underlying error"), "test_error", "test message"),
 			wantErr: "test message: underlying error",
 		},
 	}
@@ -57,20 +50,13 @@ func TestZenLockError_Error(t *testing.T) {
 
 func TestZenLockError_Unwrap(t *testing.T) {
 	underlying := errors.New("underlying error")
-	err := &ZenLockError{
-		Type:    "test_error",
-		Message: "test message",
-		Err:     underlying,
-	}
+	err := Wrap(underlying, "test_error", "test message")
 
 	if unwrapped := err.Unwrap(); unwrapped != underlying {
 		t.Errorf("ZenLockError.Unwrap() = %v, want %v", unwrapped, underlying)
 	}
 
-	errNoWrap := &ZenLockError{
-		Type:    "test_error",
-		Message: "test message",
-	}
+	errNoWrap := New("test_error", "test message")
 	if unwrapped := errNoWrap.Unwrap(); unwrapped != nil {
 		t.Errorf("ZenLockError.Unwrap() = %v, want nil", unwrapped)
 	}
@@ -80,14 +66,14 @@ func TestWithZenLock(t *testing.T) {
 	originalErr := errors.New("original error")
 	err := WithZenLock(originalErr, "test-namespace", "test-name")
 
-	if err.ZenLockNamespace != "test-namespace" {
-		t.Errorf("ZenLockNamespace = %v, want test-namespace", err.ZenLockNamespace)
+	if err.GetContext("zenlock_namespace") != "test-namespace" {
+		t.Errorf("zenlock_namespace = %v, want test-namespace", err.GetContext("zenlock_namespace"))
 	}
-	if err.ZenLockName != "test-name" {
-		t.Errorf("ZenLockName = %v, want test-name", err.ZenLockName)
+	if err.GetContext("zenlock_name") != "test-name" {
+		t.Errorf("zenlock_name = %v, want test-name", err.GetContext("zenlock_name"))
 	}
-	if err.Err != originalErr {
-		t.Errorf("Err = %v, want %v", err.Err, originalErr)
+	if err.Unwrap() != originalErr {
+		t.Errorf("Err = %v, want %v", err.Unwrap(), originalErr)
 	}
 }
 
@@ -95,14 +81,14 @@ func TestWithPod(t *testing.T) {
 	originalErr := errors.New("original error")
 	err := WithPod(originalErr, "test-namespace", "test-pod")
 
-	if err.PodNamespace != "test-namespace" {
-		t.Errorf("PodNamespace = %v, want test-namespace", err.PodNamespace)
+	if err.GetContext("pod_namespace") != "test-namespace" {
+		t.Errorf("pod_namespace = %v, want test-namespace", err.GetContext("pod_namespace"))
 	}
-	if err.PodName != "test-pod" {
-		t.Errorf("PodName = %v, want test-pod", err.PodName)
+	if err.GetContext("pod_name") != "test-pod" {
+		t.Errorf("pod_name = %v, want test-pod", err.GetContext("pod_name"))
 	}
-	if err.Err != originalErr {
-		t.Errorf("Err = %v, want %v", err.Err, originalErr)
+	if err.Unwrap() != originalErr {
+		t.Errorf("Err = %v, want %v", err.Unwrap(), originalErr)
 	}
 }
 
@@ -115,8 +101,8 @@ func TestNew(t *testing.T) {
 	if err.Message != "test message" {
 		t.Errorf("Message = %v, want test message", err.Message)
 	}
-	if err.Err != nil {
-		t.Errorf("Err = %v, want nil", err.Err)
+	if err.Unwrap() != nil {
+		t.Errorf("Err = %v, want nil", err.Unwrap())
 	}
 }
 
@@ -130,8 +116,8 @@ func TestWrap(t *testing.T) {
 	if err.Message != "test message" {
 		t.Errorf("Message = %v, want test message", err.Message)
 	}
-	if err.Err != originalErr {
-		t.Errorf("Err = %v, want %v", err.Err, originalErr)
+	if err.Unwrap() != originalErr {
+		t.Errorf("Err = %v, want %v", err.Unwrap(), originalErr)
 	}
 }
 
@@ -145,8 +131,8 @@ func TestWrapf(t *testing.T) {
 	if err.Message != "test message" {
 		t.Errorf("Message = %v, want test message", err.Message)
 	}
-	if err.Err != originalErr {
-		t.Errorf("Err = %v, want %v", err.Err, originalErr)
+	if err.Unwrap() != originalErr {
+		t.Errorf("Err = %v, want %v", err.Unwrap(), originalErr)
 	}
 }
 
@@ -155,16 +141,16 @@ func TestWithZenLock_PreservesExistingContext(t *testing.T) {
 	err1 := WithPod(originalErr, "pod-namespace", "pod-name")
 	err2 := WithZenLock(err1, "test-namespace", "test-name")
 
-	if err2.PodNamespace != "pod-namespace" {
-		t.Errorf("PodNamespace should be preserved: got %v, want pod-namespace", err2.PodNamespace)
+	if err2.GetContext("pod_namespace") != "pod-namespace" {
+		t.Errorf("pod_namespace should be preserved: got %v, want pod-namespace", err2.GetContext("pod_namespace"))
 	}
-	if err2.PodName != "pod-name" {
-		t.Errorf("PodName should be preserved: got %v, want pod-name", err2.PodName)
+	if err2.GetContext("pod_name") != "pod-name" {
+		t.Errorf("pod_name should be preserved: got %v, want pod-name", err2.GetContext("pod_name"))
 	}
-	if err2.ZenLockNamespace != "test-namespace" {
-		t.Errorf("ZenLockNamespace = %v, want test-namespace", err2.ZenLockNamespace)
+	if err2.GetContext("zenlock_namespace") != "test-namespace" {
+		t.Errorf("zenlock_namespace = %v, want test-namespace", err2.GetContext("zenlock_namespace"))
 	}
-	if err2.ZenLockName != "test-name" {
-		t.Errorf("ZenLockName = %v, want test-name", err2.ZenLockName)
+	if err2.GetContext("zenlock_name") != "test-name" {
+		t.Errorf("zenlock_name = %v, want test-name", err2.GetContext("zenlock_name"))
 	}
 }

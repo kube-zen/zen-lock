@@ -126,7 +126,7 @@ var (
 	)
 
 	// CacheSizeGauge tracks the current cache size
-	CacheSizeGauge = prometheus.NewGauge(
+	CacheSizeGauge = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "zenlock_cache_size",
 			Help: "Current number of entries in the ZenLock cache",
@@ -134,7 +134,7 @@ var (
 	)
 
 	// CacheHitRateGauge tracks the cache hit rate (hits / (hits + misses))
-	CacheHitRateGauge = prometheus.NewGauge(
+	CacheHitRateGauge = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "zenlock_cache_hit_rate",
 			Help: "Cache hit rate (hits / (hits + misses))",

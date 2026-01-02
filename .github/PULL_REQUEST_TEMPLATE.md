@@ -29,7 +29,7 @@ How was this tested?
 - [ ] Documentation updated
 - [ ] No new warnings generated
 - [ ] Tests added/updated and passing
-- [ ] Coverage maintained (>65%)
+- [ ] Coverage maintained (minimum: 40%, target: 75%, PR requirement: >65%)
 - [ ] CHANGELOG.md updated (if applicable)
 
 ## Related Issues

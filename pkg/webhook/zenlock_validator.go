@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/config"
+	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
 )
 
@@ -111,8 +113,13 @@ func (v *ZenLockValidator) validateZenLock(zenlock *securityv1alpha1.ZenLock) er
 	}
 
 	// Validate algorithm (if specified)
-	if zenlock.Spec.Algorithm != "" && zenlock.Spec.Algorithm != "age" {
-		return fmt.Errorf("unsupported algorithm %q, only 'age' is currently supported", zenlock.Spec.Algorithm)
+	algorithm := zenlock.Spec.Algorithm
+	if algorithm == "" {
+		algorithm = config.DefaultAlgorithm
+	}
+	if algorithm != config.SupportedAlgorithm {
+		metrics.RecordAlgorithmError(algorithm, "unsupported")
+		return fmt.Errorf("unsupported algorithm %q, only %q is currently supported", algorithm, config.SupportedAlgorithm)
 	}
 
 	// Validate encrypted data format (must be valid base64)
@@ -146,6 +153,7 @@ func (v *ZenLockValidator) validateZenLock(zenlock *securityv1alpha1.ZenLock) er
 	if v.privateKey != "" {
 		_, err := v.crypto.DecryptMap(zenlock.Spec.EncryptedData, v.privateKey)
 		if err != nil {
+			metrics.RecordAlgorithmError(algorithm, "decryption_failed")
 			return fmt.Errorf("failed to decrypt encryptedData: %v (data may be encrypted with a different key)", err)
 		}
 	}

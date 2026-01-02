@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
+	"github.com/kube-zen/zen-lock/pkg/config"
 )
 
 func TestPodHandler_Handle_InvalidPodDecode(t *testing.T) {
@@ -58,7 +59,7 @@ func TestPodHandler_Handle_InvalidInjectAnnotation(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "-invalid-", // Invalid annotation
+				config.AnnotationInject: "-invalid-", // Invalid annotation
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -92,8 +93,8 @@ func TestPodHandler_Handle_InvalidMountPath(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject:    "test-zenlock",
-				annotationMountPath: "/etc/", // Invalid mount path
+				config.AnnotationInject:    "test-zenlock",
+				config.AnnotationMountPath: "/etc/", // Invalid mount path
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -127,7 +128,7 @@ func TestPodHandler_Handle_ZenLockNotFound_New(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "non-existent-zenlock",
+				config.AnnotationInject: "non-existent-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -177,7 +178,7 @@ func TestPodHandler_Handle_DecryptionFailure(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -227,7 +228,7 @@ func TestPodHandler_Handle_DryRun(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -286,7 +287,7 @@ func TestPodHandler_Handle_CacheHit(t *testing.T) {
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				annotationInject: "test-zenlock",
+				config.AnnotationInject: "test-zenlock",
 			},
 		},
 		Spec: corev1.PodSpec{

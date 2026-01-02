@@ -171,3 +171,29 @@ spec:
             description: >
               zen-lock is experiencing {{ $value }} algorithm validation failures per second.
               Check ZenLock CRDs for algorithm configuration errors.
+
+        # Alert on low cache hit rate
+        - alert: ZenLockLowCacheHitRate
+          expr: zenlock_cache_hit_rate < 0.5
+          for: 10m
+          labels:
+            severity: warning
+            component: zen-lock
+          annotations:
+            summary: "Low cache hit rate detected"
+            description: >
+              Cache hit rate is {{ $value | humanizePercentage }}, indicating inefficient caching.
+              Consider increasing cache TTL or investigating cache invalidation patterns.
+
+        # Alert on large cache size
+        - alert: ZenLockLargeCacheSize
+          expr: zenlock_cache_size > 1000
+          for: 5m
+          labels:
+            severity: info
+            component: zen-lock
+          annotations:
+            summary: "Large cache size detected"
+            description: >
+              Cache contains {{ $value }} entries, which may indicate high memory usage.
+              Consider reducing cache TTL or investigating cache growth patterns.

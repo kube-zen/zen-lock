@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kube-zen/zen-lock/pkg/common"
+	"github.com/kube-zen/zen-lock/pkg/config"
 	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
@@ -98,7 +99,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}
 			// Secret is new, Pod might be created soon - retry
 			logger.V(4).Info("Pod not found for Secret, will retry", "pod", podKey, "secret", req.NamespacedName, "age", secretAge)
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: config.RequeueDelayPodNotFound}, nil
 		}
 		logger.Error(err, "Failed to get Pod for zen-lock secret", "secret", req.NamespacedName, "pod", podKey)
 		return ctrl.Result{}, fmt.Errorf("failed to get Pod: %w", err)
@@ -107,7 +108,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Pod exists and has UID - set OwnerReference
 	if pod.UID == "" {
 		logger.V(4).Info("Pod exists but has no UID yet, will retry", "pod", podKey)
-		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: config.RequeueDelayPodNoUID}, nil
 	}
 
 	// Create OwnerReference
@@ -123,9 +124,9 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Update Secret with OwnerReference (with retry for conflict errors)
 	secret.OwnerReferences = []metav1.OwnerReference{ownerRef}
 	retryConfig := retry.DefaultConfig()
-	retryConfig.MaxAttempts = 3
-	retryConfig.InitialDelay = 100 * time.Millisecond
-	retryConfig.MaxDelay = 2 * time.Second
+	retryConfig.MaxAttempts = config.DefaultRetryMaxAttempts
+	retryConfig.InitialDelay = config.DefaultRetryInitialDelay
+	retryConfig.MaxDelay = config.DefaultRetryMaxDelay
 
 	if err := retry.Do(ctx, retryConfig, func() error {
 		// Re-fetch secret to get latest version (for conflict resolution)
