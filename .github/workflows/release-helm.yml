@@ -16,6 +16,6 @@ jobs:
     uses: kube-zen/zen-oss-standards/.github/workflows/release-helm.yml@v1.0.0
     secrets: inherit
     with:
-      chart_name: 'zen-gc'  # Update with your chart name
+      chart_name: 'zen-lock'  # Chart is in helm-charts repository
       chart_path: 'charts'  # Update with your chart path
 
