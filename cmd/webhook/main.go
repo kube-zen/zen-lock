@@ -18,7 +18,7 @@ import (
 	"github.com/kube-zen/zen-lock/pkg/controller"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
 	"github.com/kube-zen/zen-sdk/pkg/leader"
-	sdklog 	"github.com/kube-zen/zen-sdk/pkg/logging"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/zenlead"
 )
 
