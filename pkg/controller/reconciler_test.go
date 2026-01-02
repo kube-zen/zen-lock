@@ -74,7 +74,7 @@ func TestZenLockReconciler_Reconcile_NotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() should not error for non-existent resource, got: %v", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for non-existent resource")
 	}
 }
