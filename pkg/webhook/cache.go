@@ -126,6 +126,7 @@ func (c *ZenLockCache) InvalidateAll() {
 }
 
 // cleanup periodically removes expired entries
+// Optimized for Go 1.25: collect expired keys first, then delete in batch
 func (c *ZenLockCache) cleanup() {
 	ticker := time.NewTicker(c.cleanupInt)
 	defer ticker.Stop()
@@ -135,10 +136,16 @@ func (c *ZenLockCache) cleanup() {
 		case <-ticker.C:
 			c.mu.Lock()
 			now := time.Now()
+			// Collect expired keys first (more efficient than deleting during iteration)
+			expiredKeys := make([]types.NamespacedName, 0)
 			for key, entry := range c.cache {
 				if now.After(entry.expiresAt) {
-					delete(c.cache, key)
+					expiredKeys = append(expiredKeys, key)
 				}
+			}
+			// Delete expired entries in batch
+			for _, key := range expiredKeys {
+				delete(c.cache, key)
 			}
 			c.mu.Unlock()
 		case <-c.stopCh:

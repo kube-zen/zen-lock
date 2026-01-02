@@ -142,7 +142,8 @@ func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secr
 
 	// Ensure labels map is initialized
 	if existingSecret.Labels == nil {
-		existingSecret.Labels = make(map[string]string)
+		// Pre-allocate labels map with estimated size (Go 1.25 optimization)
+		existingSecret.Labels = make(map[string]string, 4)
 	}
 
 	// Check if existing secret matches current ZenLock
@@ -297,7 +298,8 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	metrics.RecordDecryption(req.Namespace, injectName, "success", decryptDuration)
 
 	// Convert decrypted map to Kubernetes Secret format (base64-encoded strings)
-	secretData := make(map[string][]byte)
+	// Pre-allocate with known size for better performance (Go 1.25 optimization)
+	secretData := make(map[string][]byte, len(decryptedMap))
 	for k, v := range decryptedMap {
 		secretData[k] = v
 	}
