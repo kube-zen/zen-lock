@@ -50,7 +50,7 @@ jobs:
         run: go test -v -race -timeout=15m ./...
       
       - name: Check coverage
-        run: go test -coverprofile=coverage.out ./...
+        run: go test -coverprofile=coverage.out ./pkg/...
 
   build:
     name: Build
@@ -73,12 +73,18 @@ jobs:
       - name: Build
         run: |
           mkdir -p bin
-          go build -o bin/gc-controller ./cmd/gc-controller
+          go build -ldflags="-s -w" -trimpath -o bin/zen-lock ./cmd/cli
+          go build -ldflags="-s -w" -trimpath -o bin/zen-lock-webhook ./cmd/webhook
       
-      - name: Verify binary
+      - name: Verify binaries
         run: |
-          if [ ! -f bin/gc-controller ]; then
-            echo "Binary not found"
+          if [ ! -f bin/zen-lock ]; then
+            echo "zen-lock binary not found"
             exit 1
           fi
-          file bin/gc-controller
+          if [ ! -f bin/zen-lock-webhook ]; then
+            echo "zen-lock-webhook binary not found"
+            exit 1
+          fi
+          file bin/zen-lock
+          file bin/zen-lock-webhook
