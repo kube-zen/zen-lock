@@ -142,7 +142,7 @@ func TestZenLockReconciler_Reconcile_NotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, want no error for not found", err)
 	}
-	if result.Requeue {
+	if result.RequeueAfter > 0 {
 		t.Error("Reconcile() should not requeue for not found")
 	}
 }
