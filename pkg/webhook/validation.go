@@ -21,34 +21,20 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	sdkvalidation "github.com/kube-zen/zen-sdk/pkg/k8s/validation"
 )
 
 const (
-	// MaxAnnotationValueLength is the maximum length for annotation values
-	MaxAnnotationValueLength = 253
 	// MaxMountPathLength is the maximum reasonable mount path length
 	MaxMountPathLength = 1024
 )
 
-var (
-	// ValidKubernetesNameRegex matches valid Kubernetes resource names
-	// DNS-1123 subdomain: lowercase alphanumeric, '-' or '.', must start/end with alphanumeric
-	validKubernetesNameRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
-)
-
 // ValidateInjectAnnotation validates the zen-lock/inject annotation value
 func ValidateInjectAnnotation(injectName string) error {
-	if injectName == "" {
-		return fmt.Errorf("inject annotation value cannot be empty")
-	}
-
-	if len(injectName) > MaxAnnotationValueLength {
-		return fmt.Errorf("inject annotation value exceeds maximum length of %d", MaxAnnotationValueLength)
-	}
-
-	// Must be a valid Kubernetes resource name
-	if !validKubernetesNameRegex.MatchString(injectName) {
-		return fmt.Errorf("inject annotation value must be a valid Kubernetes resource name (DNS-1123 subdomain)")
+	// Use zen-sdk validation for Kubernetes resource name validation
+	if err := sdkvalidation.ValidateResourceName(injectName, sdkvalidation.MaxAnnotationValueLength); err != nil {
+		return fmt.Errorf("inject annotation value: %w", err)
 	}
 
 	return nil

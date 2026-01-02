@@ -28,14 +28,14 @@ spec:
         openAPIV3Schema:
           description: ZenLock is the Schema for the zenlocks API
           properties:
-          apiVersion:
+            apiVersion:
             description: |-
               APIVersion defines the versioned schema of this representation of an object.
               Servers should convert recognized schemas to the latest internal value, and
               may reject unrecognized values.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
-          kind:
+            kind:
             description: |-
               Kind is a string value representing the REST resource this object represents.
               Servers may infer this from the endpoint the client submits requests to.
@@ -43,9 +43,9 @@ spec:
               In CamelCase.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
-          metadata:
-            type: object
-          spec:
+            metadata:
+              type: object
+            spec:
             description: ZenLockSpec defines the desired state of ZenLock
             properties:
               algorithm:
@@ -91,7 +91,7 @@ spec:
             required:
               - encryptedData
             type: object
-          status:
+            status:
             description: ZenLockStatus defines the observed state of ZenLock
             properties:
               conditions:
@@ -135,7 +135,7 @@ spec:
                   - Error
                 type: string
             type: object
-        type: object
+          type: object
       served: true
       storage: true
       subresources:

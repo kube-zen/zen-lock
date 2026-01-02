@@ -1,8 +1,9 @@
 # zen-lock Integration Test Report
 
-**Date**: $(date +%Y-%m-%d)  
+**Date**: 2026-01-02  
 **Test Type**: Deployment Integration Tests  
-**Cluster**: kind (zen-lock-integration)
+**Cluster**: kind (zen-lock-integration)  
+**Go Version**: 1.25
 
 ## Executive Summary
 
@@ -22,7 +23,7 @@ This report documents the execution of deployment integration tests for zen-lock
 ### Setup Phase
 
 1. **Cluster Creation**: kind cluster `zen-lock-integration` created successfully
-2. **CRD Installation**: ZenLock CRD installed (fixed schema indentation issue)
+2. **CRD Installation**: ZenLock CRD installed (fixed schema indentation)
 3. **RBAC Installation**: ServiceAccounts and Roles installed
 4. **Image Build**: zen-lock Docker image built and loaded into kind
 5. **Deployment**: Webhook and Controller deployed to `zen-lock-system` namespace
@@ -155,18 +156,17 @@ This report documents the execution of deployment integration tests for zen-lock
 ## Issues Encountered and Resolved
 
 ### Issue 1: CRD Schema Format
-**Problem**: CRD YAML had incorrect indentation in `openAPIV3Schema`  
-**Resolution**: Fixed indentation in `config/crd/bases/security.kube-zen.io_zenlocks.yaml`
+**Problem**: CRD YAML had incorrect indentation in `openAPIV3Schema` - properties were not properly indented  
+**Resolution**: Fixed indentation for all properties under `openAPIV3Schema`
 
 ### Issue 2: Test Compilation Errors
 **Problem**: 
-- Unused imports (`rest`, `ctrl`)
-- Incorrect `apiutil.NewDynamicRESTMapper` signature
-- Unused `privateKey` variables
+- Unused imports (`rest`, `ctrl`, `apiutil`)
+- Unused `privateKey` variables (only need `publicKey` for encryption)
 
 **Resolution**: 
 - Removed unused imports
-- Simplified client creation (removed explicit REST mapper)
+- Simplified client creation (removed explicit REST mapper - client creates it automatically)
 - Removed unused `privateKey` variables (only need `publicKey` for encryption)
 
 ## Cluster State After Tests
@@ -176,7 +176,7 @@ This report documents the execution of deployment integration tests for zen-lock
 - `zen-lock-controller`: 1/1 replicas ready
 
 ### Resources Created
-- ZenLock CRDs: Multiple test instances
+- ZenLock CRDs: Multiple test instances in `zen-lock-test` namespace
 - Pods: Test pods in `zen-lock-test` namespace
 - Secrets: Ephemeral secrets (cleaned up after tests)
 

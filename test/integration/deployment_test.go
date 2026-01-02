@@ -38,7 +38,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	webhookpkg "github.com/kube-zen/zen-lock/pkg/webhook"
@@ -390,7 +389,7 @@ func TestZenLockAllowedSubjects(t *testing.T) {
 	ctx := context.Background()
 	ensureNamespace(ctx, t)
 
-	privateKey, publicKey := generateTestKeys(t)
+	_, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-value", publicKey)
 
 	// Create ServiceAccount
@@ -552,7 +551,7 @@ func TestZenLockControllerReconciliation(t *testing.T) {
 	ctx := context.Background()
 	ensureNamespace(ctx, t)
 
-	privateKey, publicKey := generateTestKeys(t)
+	_, publicKey := generateTestKeys(t)
 	encryptedValue := encryptTestData(t, "test-value", publicKey)
 
 	zenlockName := "integration-reconcile-test"
