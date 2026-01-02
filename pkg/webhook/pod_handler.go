@@ -23,6 +23,7 @@ import (
 	"github.com/kube-zen/zen-lock/pkg/common"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
+	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
 const (
@@ -127,8 +128,8 @@ func (h *PodHandler) handleDryRun(ctx context.Context, pod *corev1.Pod, secretNa
 }
 
 // ensureSecretExists ensures the secret exists and is up-to-date, handling conflicts and stale data
-func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secret, secretName, injectName, namespace, podName string, secretData map[string][]byte, startTime time.Time, retryConfig common.RetryConfig, isDryRun bool) error {
-	createErr := common.Retry(ctx, retryConfig, func() error {
+func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secret, secretName, injectName, namespace, podName string, secretData map[string][]byte, startTime time.Time, retryConfig retry.Config, isDryRun bool) error {
+	createErr := retry.Do(ctx, retryConfig, func() error {
 		return h.Client.Create(ctx, secret)
 	})
 	if createErr == nil {
@@ -142,7 +143,7 @@ func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secr
 
 	// Fetch existing secret to validate it matches current ZenLock data
 	existingSecret := &corev1.Secret{}
-	if err := common.Retry(ctx, retryConfig, func() error {
+	if err := retry.Do(ctx, retryConfig, func() error {
 		return h.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, existingSecret)
 	}); err != nil {
 		return err
@@ -162,7 +163,7 @@ func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secr
 			existingSecret.Labels[common.LabelZenLockName] = injectName
 			existingSecret.Labels[common.LabelPodName] = podName
 			existingSecret.Labels[common.LabelPodNamespace] = namespace
-			if err := common.Retry(ctx, retryConfig, func() error {
+			if err := retry.Do(ctx, retryConfig, func() error {
 				return h.Client.Update(ctx, existingSecret)
 			}); err != nil {
 				return err
@@ -176,7 +177,7 @@ func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secr
 		// Data doesn't match - update secret with fresh data
 		if !isDryRun {
 			existingSecret.Data = secretData
-			if err := common.Retry(ctx, retryConfig, func() error {
+			if err := retry.Do(ctx, retryConfig, func() error {
 				return h.Client.Update(ctx, existingSecret)
 			}); err != nil {
 				return err
@@ -328,7 +329,7 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 	}
 
 	// Ensure secret exists and is up-to-date
-	retryConfig := common.DefaultRetryConfig()
+	retryConfig := retry.DefaultConfig()
 	retryConfig.MaxAttempts = 3
 	retryConfig.InitialDelay = 50 * time.Millisecond
 	retryConfig.MaxDelay = 1 * time.Second

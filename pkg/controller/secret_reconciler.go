@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kube-zen/zen-lock/pkg/common"
+	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
 const (
@@ -121,12 +122,12 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Update Secret with OwnerReference (with retry for conflict errors)
 	secret.OwnerReferences = []metav1.OwnerReference{ownerRef}
-	retryConfig := common.DefaultRetryConfig()
+	retryConfig := retry.DefaultConfig()
 	retryConfig.MaxAttempts = 3
 	retryConfig.InitialDelay = 100 * time.Millisecond
 	retryConfig.MaxDelay = 2 * time.Second
 
-	if err := common.Retry(ctx, retryConfig, func() error {
+	if err := retry.Do(ctx, retryConfig, func() error {
 		// Re-fetch secret to get latest version (for conflict resolution)
 		currentSecret := &corev1.Secret{}
 		if err := r.Get(ctx, req.NamespacedName, currentSecret); err != nil {
