@@ -1,22 +1,22 @@
 # zen-lock
 
-Kubernetes controller for managing locks and ensuring exclusive resource access.
+Kubernetes-native secret manager with Zero-Knowledge encryption for GitOps workflows.
 
 ## Overview
 
-`zen-lock` is a Kubernetes controller that provides lock management functionality, ensuring exclusive access to resources across multiple replicas using leader election.
+zen-lock is a Kubernetes controller that implements Zero-Knowledge secret storage. ZenLock CRDs store only ciphertext (source-of-truth). During Pod injection, zen-lock decrypts in the webhook and creates an ephemeral Kubernetes Secret containing plaintext, which is mounted into the Pod. Protect ephemeral Secrets via RBAC and etcd encryption-at-rest.
 
 ## Dependencies
 
 This component uses `zen-sdk` for unified observability and infrastructure:
 
 - **`zen-sdk/pkg/logging`** - Structured, context-aware logging
-- **`zen-sdk/pkg/observability`** - OpenTelemetry distributed tracing
+- **`zen-sdk/pkg/health`** - Health check utilities
 - **`zen-sdk/pkg/leader`** - Kubernetes leader election
+- **`zen-sdk/pkg/lifecycle`** - Graceful shutdown and finalizer management
+- **`zen-sdk/pkg/errors`** - Error handling utilities
 
 See [zen-sdk README](../../zen-sdk/README.md) for more information about the SDK packages.
-
-zen-lock is a Kubernetes-native secret manager that implements Zero-Knowledge secret storage. ZenLock CRDs store only ciphertext (source-of-truth). During Pod injection, zen-lock decrypts in the webhook and creates an ephemeral Kubernetes Secret containing plaintext, which is mounted into the Pod. Protect ephemeral Secrets via RBAC and etcd encryption-at-rest.
 
 ## Features
 
