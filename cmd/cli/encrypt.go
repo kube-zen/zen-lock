@@ -98,7 +98,7 @@ file with encrypted data that can be safely committed to Git.`,
 			if output == "" {
 				fmt.Fprint(os.Stdout, string(outputData))
 			} else {
-				if err := os.WriteFile(output, outputData, 0644); err != nil {
+				if err := os.WriteFile(output, outputData, 0600); err != nil {
 					return fmt.Errorf("failed to write output file: %w", err)
 				}
 				fmt.Fprintf(os.Stderr, "✅ Encrypted secret written to: %s\n", output)
