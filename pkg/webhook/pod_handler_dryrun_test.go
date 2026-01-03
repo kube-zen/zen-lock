@@ -118,9 +118,10 @@ func TestPodHandler_HandleDryRun_MutateError(t *testing.T) {
 	response := handler.handleDryRun(ctx, pod, "test-secret", "/zen-lock/secrets", "test-zenlock", "default", time.Now(), originalObject)
 
 	// Should handle error gracefully
-	if response.Allowed && response.Result != nil && response.Result.Message == "" {
-		// If mutation fails, should return error response
-		// Note: Empty pod spec might not actually error, but tests the path
+	// If mutation fails, should return error response
+	// Note: Empty pod spec might not actually error, but tests the path
+	if !response.Allowed {
+		t.Errorf("Expected response to be allowed, got: %v", response.Result)
 	}
 }
 
@@ -154,4 +155,3 @@ func TestPodHandler_HandleDryRun_MarshalError(t *testing.T) {
 		t.Error("Expected a response from handleDryRun")
 	}
 }
-

@@ -177,7 +177,6 @@ func (r *ZenLockReconciler) handleDeletion(ctx context.Context, zenlock *securit
 	return ctrl.Result{}, nil
 }
 
-
 // updateStatus updates the ZenLock status
 func (r *ZenLockReconciler) updateStatus(ctx context.Context, zenlock *securityv1alpha1.ZenLock, phase, reason, message string) {
 	zenlock.Status.Phase = phase

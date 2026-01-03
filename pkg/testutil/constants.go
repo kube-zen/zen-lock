@@ -19,4 +19,3 @@ package testutil
 // TestPrivateKey is a test private key used in unit tests
 // This is a placeholder key that matches the AGE key format but is not a real key
 const TestPrivateKey = "AGE-SECRET-1EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE"
-

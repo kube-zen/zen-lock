@@ -33,24 +33,24 @@ import (
 func GenerateSecretName(namespace, podName string) string {
 	// Generate a stable name with hash suffix to ensure uniqueness and stay within Kubernetes limits
 	base := fmt.Sprintf("zen-lock-inject-%s-%s", namespace, podName)
-	
+
 	// Kubernetes resource names must be <= 253 characters
 	// If base is too long, truncate and add hash
 	const maxLength = 253
 	const hashLength = 8 // 8 hex chars = 4 bytes
-	
+
 	if len(base) <= maxLength-hashLength-1 {
 		return base
 	}
-	
+
 	// Truncate and add hash
 	maxBaseLength := maxLength - hashLength - 1 // -1 for hyphen
 	truncated := base[:maxBaseLength]
-	
+
 	// Generate hash of full name for uniqueness
 	hash := sha256.Sum256([]byte(base))
 	hashSuffix := hex.EncodeToString(hash[:4]) // Use first 4 bytes = 8 hex chars
-	
+
 	return fmt.Sprintf("%s-%s", truncated, hashSuffix)
 }
 
@@ -250,23 +250,9 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		Namespace: req.Namespace,
 	}
 
-	// Try cache first
-	zenlock, cacheHit := h.cache.Get(zenlockKey)
-	if cacheHit {
-		metrics.RecordCacheHit(req.Namespace, injectName)
-	} else {
-		metrics.RecordCacheMiss(req.Namespace, injectName)
-		// Fetch from API server
-		zenlock = &securityv1alpha1.ZenLock{}
-		if err := h.Client.Get(ctx, zenlockKey, zenlock); err != nil {
-			duration := time.Since(startTime).Seconds()
-			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-			// Sanitize error to prevent information leakage
-			sanitizedErr := SanitizeError(err, "fetch ZenLock")
-			return admission.Errored(http.StatusInternalServerError, sanitizedErr)
-		}
-		// Cache the result
-		h.cache.Set(zenlockKey, zenlock)
+	zenlock, resp := h.fetchZenLock(ctx, zenlockKey, req.Namespace, injectName, startTime)
+	if resp.Result != nil {
+		return resp
 	}
 
 	// Validate AllowedSubjects if specified
