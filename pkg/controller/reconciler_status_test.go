@@ -117,14 +117,9 @@ func TestZenLockReconciler_UpdateStatus_UpdateExistingCondition(t *testing.T) {
 
 	ctx := context.Background()
 	// Update with same status (Ready -> True) - should not change LastTransitionTime
-	// Need to update the zenlock object in the client first
-	if err := client.Update(ctx, zenlock); err != nil {
-		t.Fatalf("Failed to update ZenLock: %v", err)
-	}
-
 	reconciler.updateStatus(ctx, zenlock, "Ready", "Decrypted", "New message")
 
-	// Update status in client
+	// Update status in client (updateStatus modifies in-place, caller must persist)
 	if err := client.Status().Update(ctx, zenlock); err != nil {
 		t.Fatalf("Failed to update ZenLock status: %v", err)
 	}
@@ -143,12 +138,18 @@ func TestZenLockReconciler_UpdateStatus_UpdateExistingCondition(t *testing.T) {
 		t.Errorf("Expected message 'New message', got '%s'", condition.Message)
 	}
 	// LastTransitionTime should remain the same when status doesn't change
-	// Note: The condition might be updated in-place, so we check that the time is preserved
+	// The condition status is "True" in both cases, so LastTransitionTime should be preserved
 	if condition.LastTransitionTime == nil {
 		t.Error("Expected LastTransitionTime to be set")
-	} else if !condition.LastTransitionTime.Time.Equal(now.Time) && !condition.LastTransitionTime.Time.Before(now.Time.Add(1*time.Second)) {
-		// Allow small time differences due to test execution timing
-		t.Logf("LastTransitionTime changed from %v to %v (may be expected due to timing)", now.Time, condition.LastTransitionTime.Time)
+	} else if !condition.LastTransitionTime.Time.Equal(now.Time) {
+		// Check if it's the same time (within 1 second tolerance for test timing)
+		diff := condition.LastTransitionTime.Time.Sub(now.Time)
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff > time.Second {
+			t.Errorf("Expected LastTransitionTime to remain unchanged when status doesn't change, got %v (was %v)", condition.LastTransitionTime.Time, now.Time)
+		}
 	}
 }
 
