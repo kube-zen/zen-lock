@@ -13,11 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kube-zen/zen-lock/pkg/common"
 	"github.com/kube-zen/zen-lock/pkg/config"
-	sdkmetadata "github.com/kube-zen/zen-sdk/pkg/k8s/metadata"
 	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
@@ -125,9 +125,9 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Get(ctx, req.NamespacedName, currentSecret); err != nil {
 			return err
 		}
-		// Set owner reference using zen-sdk/pkg/k8s/metadata
+		// Set owner reference using controllerutil
 		// This ensures proper scheme handling and garbage collection
-		if err := sdkmetadata.SetOwnerReference(pod, currentSecret, r.Scheme); err != nil {
+		if err := controllerutil.SetOwnerReference(pod, currentSecret, r.Scheme); err != nil {
 			return fmt.Errorf("failed to set owner reference: %w", err)
 		}
 		return r.Update(ctx, currentSecret)
