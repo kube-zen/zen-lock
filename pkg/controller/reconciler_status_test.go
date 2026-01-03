@@ -279,8 +279,9 @@ func TestZenLockReconciler_Reconcile_PrivateKeyReload(t *testing.T) {
 
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-zenlock",
-			Namespace: "default",
+			Name:       "test-zenlock",
+			Namespace:  "default",
+			Finalizers: []string{"zenlocks.security.kube-zen.io/finalizer"}, // Add finalizer so we skip that path
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
 			EncryptedData: map[string]string{

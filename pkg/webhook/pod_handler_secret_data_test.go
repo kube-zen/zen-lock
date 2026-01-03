@@ -448,4 +448,3 @@ func TestPodHandler_EnsureSecretExists_NilLabels(t *testing.T) {
 		t.Errorf("Expected ZenLock name 'test-zenlock', got '%s'", updatedSecret.Labels[common.LabelZenLockName])
 	}
 }
-
