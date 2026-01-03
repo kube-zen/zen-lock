@@ -107,8 +107,16 @@ build_and_load_image() {
     
     local image_name="kubezen/zen-lock:integration-test"
     
-    # Build image
-    docker build -t "$image_name" "$PROJECT_ROOT" || {
+    # Build image from project root (Dockerfile expects zen-lock/ and zen-sdk/ directories)
+    local workspace_root="$(cd "$PROJECT_ROOT/../.." && pwd)"
+    if [ ! -d "$workspace_root/zen-sdk" ]; then
+        log_error "zen-sdk directory not found at $workspace_root/zen-sdk"
+        log_error "Dockerfile requires both zen-lock and zen-sdk to be in the same parent directory"
+        exit 1
+    fi
+    
+    # Build from workspace root
+    docker build -f "$PROJECT_ROOT/Dockerfile" -t "$image_name" "$workspace_root" || {
         log_error "Failed to build image"
         exit 1
     }
