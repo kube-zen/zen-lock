@@ -114,10 +114,6 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Set owner reference using zen-sdk/pkg/k8s/metadata
 	// This ensures proper scheme handling and garbage collection
-	if err := sdkmetadata.SetOwnerReference(pod, secret, r.Scheme); err != nil {
-		logger.Error(err, "Failed to set owner reference on Secret", "secret", req.NamespacedName, "pod", podKey)
-		return ctrl.Result{}, fmt.Errorf("failed to set owner reference: %w", err)
-	}
 	retryConfig := retry.DefaultConfig()
 	retryConfig.MaxAttempts = config.DefaultRetryMaxAttempts
 	retryConfig.InitialDelay = config.DefaultRetryInitialDelay
@@ -129,7 +125,11 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Get(ctx, req.NamespacedName, currentSecret); err != nil {
 			return err
 		}
-		currentSecret.OwnerReferences = []metav1.OwnerReference{ownerRef}
+		// Set owner reference using zen-sdk/pkg/k8s/metadata
+		// This ensures proper scheme handling and garbage collection
+		if err := sdkmetadata.SetOwnerReference(pod, currentSecret, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set owner reference: %w", err)
+		}
 		return r.Update(ctx, currentSecret)
 	}); err != nil {
 		logger.Error(err, "Failed to update Secret with OwnerReference after retries", "secret", req.NamespacedName, "pod", podKey)

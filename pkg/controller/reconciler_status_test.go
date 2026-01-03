@@ -285,7 +285,15 @@ func TestZenLockReconciler_Reconcile_PrivateKeyReload(t *testing.T) {
 }
 
 func TestZenLockReconciler_HandleDeletion_SecretListError(t *testing.T) {
-	reconciler, clientBuilder := setupTestReconciler(t)
+	// Create scheme with corev1 support
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
+
+	reconciler, err := NewZenLockReconciler(fake.NewClientBuilder().WithScheme(scheme).Build(), scheme)
+	if err != nil {
+		t.Fatalf("Failed to create reconciler: %v", err)
+	}
 
 	now := metav1.Now()
 	zenlock := &securityv1alpha1.ZenLock{
@@ -303,7 +311,7 @@ func TestZenLockReconciler_HandleDeletion_SecretListError(t *testing.T) {
 	}
 
 	// Create a client that will fail on List operations
-	client := clientBuilder.WithObjects(zenlock).Build()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(zenlock).Build()
 	reconciler.Client = client
 
 	req := reconcile.Request{
@@ -328,7 +336,15 @@ func TestZenLockReconciler_HandleDeletion_SecretListError(t *testing.T) {
 }
 
 func TestZenLockReconciler_HandleDeletion_DeleteSecretError(t *testing.T) {
-	reconciler, clientBuilder := setupTestReconciler(t)
+	// Create scheme with corev1 support
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
+
+	reconciler, err := NewZenLockReconciler(fake.NewClientBuilder().WithScheme(scheme).Build(), scheme)
+	if err != nil {
+		t.Fatalf("Failed to create reconciler: %v", err)
+	}
 
 	now := metav1.Now()
 	zenlock := &securityv1alpha1.ZenLock{
@@ -355,7 +371,7 @@ func TestZenLockReconciler_HandleDeletion_DeleteSecretError(t *testing.T) {
 		},
 	}
 
-	client := clientBuilder.WithObjects(zenlock, secret).Build()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(zenlock, secret).Build()
 	reconciler.Client = client
 
 	req := reconcile.Request{
