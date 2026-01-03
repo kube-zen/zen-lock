@@ -59,6 +59,10 @@ spec:
             - containerPort: 8081
               name: health
               protocol: TCP
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /healthz
@@ -78,6 +82,10 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: zen-lock-webhook-cert
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration

@@ -1,13 +1,14 @@
 #!/bin/bash
-# Setup script for zen-lock integration tests with kind
-# Creates a kind cluster, deploys CRDs, RBAC, and zen-lock controller/webhook
+# Setup script for zen-lock integration tests with kind or k3d
+# Creates a cluster, installs cert-manager, deploys CRDs, RBAC, and zen-lock controller/webhook
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLUSTER_NAME="${CLUSTER_NAME:-zen-lock-integration}"
-KUBECONFIG_PATH="${KUBECONFIG_PATH:-${HOME}/.kube/zen-lock-integration-config}"
+CLUSTER_TYPE="${CLUSTER_TYPE:-kind}"  # kind or k3d
+KUBECONFIG_PATH="${KUBECONFIG_PATH:-${HOME}/.kube/${CLUSTER_NAME}-config}"
 
 log_info() {
     echo "[INFO] $*" >&2
@@ -22,9 +23,16 @@ check_prerequisites() {
     
     local missing=0
     
-    if ! command -v kind >/dev/null 2>&1; then
-        log_error "kind is not installed. Install from https://kind.sigs.k8s.io/"
-        missing=1
+    if [ "$CLUSTER_TYPE" = "k3d" ]; then
+        if ! command -v k3d >/dev/null 2>&1; then
+            log_error "k3d is not installed. Install from https://k3d.io/"
+            missing=1
+        fi
+    else
+        if ! command -v kind >/dev/null 2>&1; then
+            log_error "kind is not installed. Install from https://kind.sigs.k8s.io/"
+            missing=1
+        fi
     fi
     
     if ! command -v kubectl >/dev/null 2>&1; then
@@ -45,10 +53,34 @@ check_prerequisites() {
 }
 
 create_cluster() {
-    log_info "Creating kind cluster: $CLUSTER_NAME"
+    log_info "Creating $CLUSTER_TYPE cluster: $CLUSTER_NAME"
     
+    if [ "$CLUSTER_TYPE" = "k3d" ]; then
+        # Check if k3d cluster exists
+        if k3d cluster list | grep -q "^${CLUSTER_NAME}"; then
+            log_info "k3d cluster $CLUSTER_NAME already exists"
+            return 0
+        fi
+        
+        # Create k3d cluster
+        k3d cluster create "$CLUSTER_NAME" || {
+            log_error "Failed to create k3d cluster"
+            exit 1
+        }
+        
+        # Export kubeconfig
+        k3d kubeconfig write "$CLUSTER_NAME" > "$KUBECONFIG_PATH" || {
+            log_error "Failed to export kubeconfig"
+            exit 1
+        }
+        
+        log_info "k3d cluster created: $CLUSTER_NAME"
+        return 0
+    fi
+    
+    # Default to kind
     if kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
-        log_info "Cluster $CLUSTER_NAME already exists"
+        log_info "kind cluster $CLUSTER_NAME already exists"
         return 0
     fi
     
@@ -74,13 +106,20 @@ nodes:
     protocol: TCP
 EOF
     
-    log_info "Cluster created successfully"
+    log_info "kind cluster created successfully"
 }
 
 export_kubeconfig() {
     log_info "Exporting kubeconfig..."
-    kind get kubeconfig --name "$CLUSTER_NAME" > "$KUBECONFIG_PATH"
-    log_info "Kubeconfig exported to: $KUBECONFIG_PATH"
+    
+    if [ "$CLUSTER_TYPE" = "k3d" ]; then
+        # k3d already exported kubeconfig in create_cluster
+        log_info "Kubeconfig exported to: $KUBECONFIG_PATH"
+    else
+        kind get kubeconfig --name "$CLUSTER_NAME" > "$KUBECONFIG_PATH"
+        log_info "Kubeconfig exported to: $KUBECONFIG_PATH"
+    fi
+    
     log_info "To use this cluster, run: export KUBECONFIG=$KUBECONFIG_PATH"
 }
 
@@ -121,6 +160,33 @@ install_cert_manager() {
     log_info "cert-manager installed and ready"
 }
 
+install_certificate() {
+    log_info "Installing certificate and issuer..."
+    
+    local namespace="zen-lock-system"
+    
+    # Create namespace first
+    kubectl create namespace "$namespace" --kubeconfig="$KUBECONFIG_PATH" --dry-run=client -o yaml | \
+        kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f -
+    
+    # Apply certificate and issuer
+    kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f "$PROJECT_ROOT/config/webhook/certificate.yaml" || {
+        log_error "Failed to apply certificate"
+        exit 1
+    }
+    
+    # Wait for certificate to be ready
+    log_info "Waiting for certificate to be ready..."
+    kubectl wait --kubeconfig="$KUBECONFIG_PATH" --for=condition=ready \
+        certificate/zen-lock-webhook-cert -n "$namespace" \
+        --timeout=120s || {
+        log_error "Certificate failed to become ready"
+        exit 1
+    }
+    
+    log_info "Certificate installed and ready"
+}
+
 install_rbac() {
     log_info "Installing RBAC..."
     # Create namespace first (required for ServiceAccounts)
@@ -150,12 +216,20 @@ build_and_load_image() {
         exit 1
     }
     
-    # Load into kind
-    log_info "Loading image into kind cluster..."
-    kind load docker-image "$image_name" --name "$CLUSTER_NAME" || {
-        log_error "Failed to load image into kind"
-        exit 1
-    }
+    # Load into cluster based on type
+    if [ "$CLUSTER_TYPE" = "k3d" ]; then
+        log_info "Loading image into k3d cluster..."
+        k3d image import "$image_name" -c "$CLUSTER_NAME" || {
+            log_error "Failed to load image into k3d cluster"
+            exit 1
+        }
+    else
+        log_info "Loading image into kind cluster..."
+        kind load docker-image "$image_name" --name "$CLUSTER_NAME" || {
+            log_error "Failed to load image into kind"
+            exit 1
+        }
+    fi
     
     log_info "Image built and loaded: $image_name"
     echo "$image_name"
@@ -186,133 +260,34 @@ deploy_zen_lock() {
         --dry-run=client -o yaml | \
         kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f -
     
-    # Create Deployment manifest
-    cat <<EOF | kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: zen-lock-webhook
-  namespace: $namespace
-  labels:
-    app.kubernetes.io/name: zen-lock
-    app.kubernetes.io/component: webhook
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: zen-lock
-      app.kubernetes.io/component: webhook
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: zen-lock
-        app.kubernetes.io/component: webhook
-    spec:
-      serviceAccountName: zen-lock-webhook
-      containers:
-      - name: webhook
-        image: $image_name
-        imagePullPolicy: Never
-        command: ["/zen-lock-webhook"]
-        args:
-        - --enable-webhook=true
-        - --enable-controller=false
-        env:
-        - name: ZEN_LOCK_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: zen-lock-master-key
-              key: key.txt
-        ports:
-        - containerPort: 9443
-          name: webhook-server
-          protocol: TCP
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 256Mi
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 9443
-            scheme: HTTPS
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 9443
-            scheme: HTTPS
-          initialDelaySeconds: 10
-          periodSeconds: 30
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: zen-lock-controller
-  namespace: $namespace
-  labels:
-    app.kubernetes.io/name: zen-lock
-    app.kubernetes.io/component: controller
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: zen-lock
-      app.kubernetes.io/component: controller
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: zen-lock
-        app.kubernetes.io/component: controller
-    spec:
-      serviceAccountName: zen-lock-controller
-      containers:
-      - name: controller
-        image: $image_name
-        imagePullPolicy: Never
-        command: ["/zen-lock-webhook"]
-        args:
-        - --enable-webhook=false
-        - --enable-controller=true
-        - --leader-election-id=zen-lock-controller-leader-election
-        env:
-        - name: ZEN_LOCK_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: zen-lock-master-key
-              key: key.txt
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 256Mi
-EOF
+    # Apply webhook deployment from manifests.yaml (includes cert-manager secret mount)
+    kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f "$PROJECT_ROOT/config/webhook/manifests.yaml"
+    
+    # Update image and imagePullPolicy
+    kubectl set image deployment/zen-lock-webhook webhook="$image_name" -n "$namespace" --kubeconfig="$KUBECONFIG_PATH"
+    kubectl patch deployment zen-lock-webhook -n "$namespace" --kubeconfig="$KUBECONFIG_PATH" \
+        --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"}]' || true
+    
+    # Apply controller deployment
+    kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f "$PROJECT_ROOT/config/webhook/controller-manifests.yaml"
+    kubectl set image deployment/zen-lock-controller controller="$image_name" -n "$namespace" --kubeconfig="$KUBECONFIG_PATH"
+    kubectl patch deployment zen-lock-controller -n "$namespace" --kubeconfig="$KUBECONFIG_PATH" \
+        --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"}]' || true
     
     log_info "Waiting for deployments to be ready..."
     kubectl wait --kubeconfig="$KUBECONFIG_PATH" \
         --for=condition=available \
-        --timeout=120s \
+        --timeout=180s \
         deployment/zen-lock-webhook \
         deployment/zen-lock-controller \
         -n "$namespace" || {
         log_error "Deployments failed to become ready"
         kubectl get pods --kubeconfig="$KUBECONFIG_PATH" -n "$namespace"
+        kubectl describe pod -n "$namespace" --kubeconfig="$KUBECONFIG_PATH" -l app=zen-lock-webhook || true
         exit 1
     }
     
     log_info "zen-lock deployed successfully"
-}
-
-install_webhook() {
-    log_info "Installing webhook configuration..."
-    kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f "$PROJECT_ROOT/config/webhook/"
-    log_info "Webhook installed"
 }
 
 wait_for_ready() {
@@ -322,12 +297,12 @@ wait_for_ready() {
     # Wait for webhook pod
     kubectl wait --kubeconfig="$KUBECONFIG_PATH" \
         --for=condition=ready \
-        --timeout=60s \
-        pod -l app.kubernetes.io/name=zen-lock,app.kubernetes.io/component=webhook \
+        --timeout=120s \
+        pod -l app=zen-lock-webhook \
         -n "$namespace" || {
         log_error "Webhook pod not ready"
         kubectl logs --kubeconfig="$KUBECONFIG_PATH" \
-            -l app.kubernetes.io/name=zen-lock,app.kubernetes.io/component=webhook \
+            -l app=zen-lock-webhook \
             -n "$namespace" || true
         exit 1
     }
@@ -335,12 +310,12 @@ wait_for_ready() {
     # Wait for controller pod
     kubectl wait --kubeconfig="$KUBECONFIG_PATH" \
         --for=condition=ready \
-        --timeout=60s \
-        pod -l app.kubernetes.io/name=zen-lock,app.kubernetes.io/component=controller \
+        --timeout=120s \
+        pod -l app=zen-lock-controller \
         -n "$namespace" || {
         log_error "Controller pod not ready"
         kubectl logs --kubeconfig="$KUBECONFIG_PATH" \
-            -l app.kubernetes.io/name=zen-lock,app.kubernetes.io/component=controller \
+            -l app=zen-lock-controller \
             -n "$namespace" || true
         exit 1
     }
@@ -348,11 +323,46 @@ wait_for_ready() {
     log_info "zen-lock is ready"
 }
 
-cleanup_cluster() {
-    log_info "Cleaning up cluster..."
-    kind delete cluster --name "$CLUSTER_NAME" || true
-    rm -f "$KUBECONFIG_PATH"
-    log_info "Cleanup complete"
+delete_cluster() {
+    log_info "Deleting $CLUSTER_TYPE cluster: $CLUSTER_NAME"
+    
+    if [ "$CLUSTER_TYPE" = "k3d" ]; then
+        if ! k3d cluster list | grep -q "^${CLUSTER_NAME}"; then
+            log_info "k3d cluster $CLUSTER_NAME does not exist"
+            return 0
+        fi
+        
+        k3d cluster delete "$CLUSTER_NAME" || {
+            log_error "Failed to delete k3d cluster"
+            exit 1
+        }
+        
+        # Clean up kubeconfig
+        if [ -f "$KUBECONFIG_PATH" ]; then
+            rm -f "$KUBECONFIG_PATH"
+        fi
+        
+        log_info "k3d cluster deleted: $CLUSTER_NAME"
+        return 0
+    fi
+    
+    # Default to kind
+    if ! kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
+        log_info "kind cluster $CLUSTER_NAME does not exist"
+        return 0
+    fi
+    
+    kind delete cluster --name "$CLUSTER_NAME" || {
+        log_error "Failed to delete kind cluster"
+        exit 1
+    }
+    
+    # Clean up kubeconfig
+    if [ -f "$KUBECONFIG_PATH" ]; then
+        rm -f "$KUBECONFIG_PATH"
+    fi
+    
+    log_info "kind cluster deleted: $CLUSTER_NAME"
 }
 
 print_usage() {
@@ -360,19 +370,23 @@ print_usage() {
 Usage: $0 [COMMAND]
 
 Commands:
-    create      Create kind cluster and deploy zen-lock
-    delete      Delete kind cluster
+    create      Create cluster and deploy zen-lock
+    delete      Delete cluster
     kubeconfig  Show kubeconfig export command
     help        Show this help message
 
 Environment Variables:
-    CLUSTER_NAME       Name of the kind cluster (default: zen-lock-integration)
-    KUBECONFIG_PATH    Path to kubeconfig file (default: ~/.kube/zen-lock-integration-config)
+    CLUSTER_NAME       Name of the cluster (default: zen-lock-integration)
+    CLUSTER_TYPE       Type of cluster: kind or k3d (default: kind)
+    KUBECONFIG_PATH    Path to kubeconfig file (default: ~/.kube/\${CLUSTER_NAME}-config)
     ZEN_LOCK_PRIVATE_KEY  Private key for zen-lock (will generate if not set)
 
 Examples:
-    # Create cluster and deploy zen-lock
+    # Create kind cluster and deploy zen-lock
     $0 create
+
+    # Create k3d cluster
+    CLUSTER_TYPE=k3d CLUSTER_NAME=astesterole $0 create
 
     # Delete cluster
     $0 delete
@@ -389,16 +403,17 @@ main() {
             create_cluster
             export_kubeconfig
             install_crds
+            install_cert_manager
+            install_certificate
             install_rbac
             image_name=$(build_and_load_image)
             deploy_zen_lock "$image_name"
-            install_webhook
             wait_for_ready
             log_info "✅ zen-lock integration test environment is ready!"
             log_info "Export kubeconfig: export KUBECONFIG=$KUBECONFIG_PATH"
             ;;
         delete)
-            cleanup_cluster
+            delete_cluster
             ;;
         kubeconfig)
             echo "$KUBECONFIG_PATH"
@@ -415,4 +430,3 @@ main() {
 }
 
 main "$@"
-
