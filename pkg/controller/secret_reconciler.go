@@ -124,10 +124,11 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Get(ctx, req.NamespacedName, currentSecret); err != nil {
 			return err
 		}
-		// Set owner reference using controllerutil
+		// Set controller reference using controllerutil
 		// This ensures proper scheme handling and garbage collection
-		if err := controllerutil.SetOwnerReference(pod, currentSecret, r.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference: %w", err)
+		// Use SetControllerReference to set Controller=true for proper cleanup
+		if err := controllerutil.SetControllerReference(pod, currentSecret, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set controller reference: %w", err)
 		}
 		return r.Update(ctx, currentSecret)
 	}); err != nil {

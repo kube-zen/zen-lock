@@ -28,13 +28,13 @@ func TestZenLockError_Error(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "error with message only",
-			err:  New("test_error", "test message"),
+			name:    "error with message only",
+			err:     New("test_error", "test message"),
 			wantErr: "test message",
 		},
 		{
-			name: "error with underlying error",
-			err:  Wrap(errors.New("underlying error"), "test_error", "test message"),
+			name:    "error with underlying error",
+			err:     Wrap(errors.New("underlying error"), "test_error", "test message"),
 			wantErr: "test message: underlying error",
 		},
 	}

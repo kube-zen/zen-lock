@@ -103,4 +103,3 @@ func TestPodHandler_CreateMutationResponse_MarshalError(t *testing.T) {
 		t.Error("Expected a valid response from createMutationResponse")
 	}
 }
-

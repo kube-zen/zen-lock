@@ -27,12 +27,12 @@ func TestPodHandler_MutatePod(t *testing.T) {
 	handler, _ := setupTestPodHandler(t)
 
 	tests := []struct {
-		name      string
-		pod       *corev1.Pod
+		name       string
+		pod        *corev1.Pod
 		secretName string
 		mountPath  string
-		wantErr   bool
-		validate  func(t *testing.T, pod *corev1.Pod)
+		wantErr    bool
+		validate   func(t *testing.T, pod *corev1.Pod)
 	}{
 		{
 			name: "pod with no volumes",
@@ -81,7 +81,7 @@ func TestPodHandler_MutatePod(t *testing.T) {
 					},
 					Containers: []corev1.Container{
 						{
-							Name: "test-container",
+							Name:  "test-container",
 							Image: "nginx",
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "existing-volume", MountPath: "/existing"},
@@ -201,4 +201,3 @@ func TestPodHandler_MutatePod_CustomMountPath(t *testing.T) {
 		t.Errorf("Expected mount path '%s', got '%s'", customMountPath, pod.Spec.Containers[0].VolumeMounts[0].MountPath)
 	}
 }
-

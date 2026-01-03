@@ -63,12 +63,11 @@ func TestGenerateSecretName(t *testing.T) {
 				if len(secretName) > 253 {
 					t.Errorf("Secret name exceeds 253 chars: %d", len(secretName))
 				}
-				// Should have hash suffix when truncated
+				// Base name: "zen-lock-inject-" (17) + 100 'a' + "-" (1) + 100 'b' = 218 chars
+				// Since 218 <= 253 - 8 - 1 = 244, it won't be truncated, so no hash suffix
 				base := "zen-lock-inject-" + strings.Repeat("a", 100) + "-" + strings.Repeat("b", 100)
-				hash := sha256.Sum256([]byte(base))
-				hashStr := hex.EncodeToString(hash[:4]) // 8 hex chars
-				if !strings.HasSuffix(secretName, hashStr) {
-					t.Errorf("Expected hash suffix %s, got %s", hashStr, secretName)
+				if secretName != base {
+					t.Errorf("Expected base name %s, got %s", base, secretName)
 				}
 			},
 		},
