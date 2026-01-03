@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	sdknames "github.com/kube-zen/zen-sdk/pkg/k8s/names"
 	"github.com/kube-zen/zen-sdk/pkg/retry"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
