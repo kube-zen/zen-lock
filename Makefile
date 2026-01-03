@@ -68,27 +68,42 @@ test-integration:
 	@echo "Running integration tests..."
 	go test -v -timeout=5m ./test/integration/... -tags=integration
 
-# Run deployment integration tests (requires kind cluster)
-# Usage: make test-integration-deploy CLUSTER_NAME=zen-lock-integration
+# Run deployment integration tests (requires kind or k3d cluster)
+# Usage: make test-integration-deploy CLUSTER_NAME=zen-lock-integration CLUSTER_TYPE=kind
+#        make test-integration-deploy CLUSTER_NAME=astesterole CLUSTER_TYPE=k3d
 test-integration-deploy:
 	@echo "Running deployment integration tests..."
-	@if [ -z "$$KUBECONFIG" ] && [ ! -f "$$HOME/.kube/zen-lock-integration-config" ]; then \
+	@CLUSTER_NAME=$${CLUSTER_NAME:-zen-lock-integration}; \
+	CLUSTER_TYPE=$${CLUSTER_TYPE:-kind}; \
+	KUBECONFIG_PATH=$$HOME/.kube/$${CLUSTER_NAME}-config; \
+	if [ -z "$$KUBECONFIG" ] && [ ! -f "$$KUBECONFIG_PATH" ]; then \
 		echo "⚠️  KUBECONFIG not set. Setting up test cluster..."; \
-		cd test/integration && ./setup_kind.sh create; \
-		export KUBECONFIG=$$HOME/.kube/zen-lock-integration-config; \
-	fi
-	@export KUBECONFIG=$${KUBECONFIG:-$$HOME/.kube/zen-lock-integration-config}; \
-	go test -v -tags=integration -timeout=10m ./test/integration/... -run TestZenLockDeployment
+		cd test/integration && CLUSTER_NAME=$$CLUSTER_NAME CLUSTER_TYPE=$$CLUSTER_TYPE KUBECONFIG_PATH=$$KUBECONFIG_PATH ./setup_kind.sh create; \
+		export KUBECONFIG=$$KUBECONFIG_PATH; \
+	fi; \
+	export KUBECONFIG=$${KUBECONFIG:-$$KUBECONFIG_PATH}; \
+	go test -v -tags=integration -timeout=15m ./test/integration/... -run TestZenLock; \
+	echo "Cleaning up cluster..."; \
+	cd test/integration && CLUSTER_NAME=$$CLUSTER_NAME CLUSTER_TYPE=$$CLUSTER_TYPE KUBECONFIG_PATH=$$KUBECONFIG_PATH ./setup_kind.sh delete
 
-# Setup integration test cluster with kind
+# Setup integration test cluster (kind or k3d)
+# Usage: make test-integration-setup CLUSTER_NAME=zen-lock-integration CLUSTER_TYPE=kind
+#        make test-integration-setup CLUSTER_NAME=astesterole CLUSTER_TYPE=k3d
 test-integration-setup:
 	@echo "Setting up integration test cluster..."
-	@cd test/integration && ./setup_kind.sh create
+	@CLUSTER_NAME=$${CLUSTER_NAME:-zen-lock-integration}; \
+	CLUSTER_TYPE=$${CLUSTER_TYPE:-kind}; \
+	KUBECONFIG_PATH=$$HOME/.kube/$${CLUSTER_NAME}-config; \
+	cd test/integration && CLUSTER_NAME=$$CLUSTER_NAME CLUSTER_TYPE=$$CLUSTER_TYPE KUBECONFIG_PATH=$$KUBECONFIG_PATH ./setup_kind.sh create
 
 # Cleanup integration test cluster
+# Usage: make test-integration-cleanup CLUSTER_NAME=zen-lock-integration CLUSTER_TYPE=kind
 test-integration-cleanup:
 	@echo "Cleaning up integration test cluster..."
-	@cd test/integration && ./setup_kind.sh delete
+	@CLUSTER_NAME=$${CLUSTER_NAME:-zen-lock-integration}; \
+	CLUSTER_TYPE=$${CLUSTER_TYPE:-kind}; \
+	KUBECONFIG_PATH=$$HOME/.kube/$${CLUSTER_NAME}-config; \
+	cd test/integration && CLUSTER_NAME=$$CLUSTER_NAME CLUSTER_TYPE=$$CLUSTER_TYPE KUBECONFIG_PATH=$$KUBECONFIG_PATH ./setup_kind.sh delete
 
 # Run E2E tests (requires kubebuilder binaries)
 # Install kubebuilder: https://kubebuilder.io/docs/getting-started/installation/

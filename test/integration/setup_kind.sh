@@ -93,6 +93,34 @@ install_crds() {
     log_info "CRDs installed"
 }
 
+install_cert_manager() {
+    log_info "Installing cert-manager..."
+    
+    # Check if cert-manager is already installed
+    if kubectl get crd certificates.cert-manager.io --kubeconfig="$KUBECONFIG_PATH" >/dev/null 2>&1; then
+        log_info "cert-manager already installed"
+        return 0
+    fi
+    
+    # Install cert-manager using kubectl
+    kubectl apply --kubeconfig="$KUBECONFIG_PATH" -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml || {
+        log_error "Failed to install cert-manager"
+        exit 1
+    }
+    
+    # Wait for cert-manager to be ready
+    log_info "Waiting for cert-manager to be ready..."
+    kubectl wait --kubeconfig="$KUBECONFIG_PATH" --for=condition=ready pod \
+        -l app.kubernetes.io/instance=cert-manager \
+        -n cert-manager \
+        --timeout=300s || {
+        log_error "cert-manager failed to become ready"
+        exit 1
+    }
+    
+    log_info "cert-manager installed and ready"
+}
+
 install_rbac() {
     log_info "Installing RBAC..."
     # Create namespace first (required for ServiceAccounts)
