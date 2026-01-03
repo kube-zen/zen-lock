@@ -3,8 +3,6 @@ package webhook
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,40 +17,40 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	sdknames "github.com/kube-zen/zen-sdk/pkg/k8s/names"
+	"github.com/kube-zen/zen-sdk/pkg/retry"
+
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/common"
 	"github.com/kube-zen/zen-lock/pkg/config"
 	"github.com/kube-zen/zen-lock/pkg/controller/metrics"
 	"github.com/kube-zen/zen-lock/pkg/crypto"
-	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
 // GenerateSecretName generates a stable secret name from namespace and pod name
 // This function is exported for testing purposes
 func GenerateSecretName(namespace, podName string) string {
-	secretNameBase := fmt.Sprintf("zen-lock-inject-%s-%s", namespace, podName)
-	hash := sha256.Sum256([]byte(secretNameBase))
-	hashStr := hex.EncodeToString(hash[:])[:16] // Use first 16 chars of hash
-
-	// Build name with hash suffix: zen-lock-inject-<namespace>-<podName>-<hash>
-	// Hash suffix is critical for uniqueness, so we preserve it even when truncating
-	prefix := fmt.Sprintf("zen-lock-inject-%s-%s-", namespace, podName)
-	secretName := prefix + hashStr
-
-	// Ensure name is valid (max 253 chars, lowercase alphanumeric + dash)
-	// If truncation is needed, preserve hash suffix and truncate prefix
-	if len(secretName) > 253 {
-		maxPrefixLen := 253 - len(hashStr) - 1 // -1 for dash
-		if maxPrefixLen < len("zen-lock-inject-") {
-			// Extreme case: use minimal prefix + full hash
-			secretName = fmt.Sprintf("zl-%s", hashStr)
-		} else {
-			// Truncate prefix, preserve hash
-			truncatedPrefix := prefix[:maxPrefixLen]
-			secretName = truncatedPrefix + hashStr
-		}
+	// Generate a stable name with hash suffix to ensure uniqueness and stay within Kubernetes limits
+	base := fmt.Sprintf("zen-lock-inject-%s-%s", namespace, podName)
+	
+	// Kubernetes resource names must be <= 253 characters
+	// If base is too long, truncate and add hash
+	const maxLength = 253
+	const hashLength = 8 // 8 hex chars = 4 bytes
+	
+	if len(base) <= maxLength-hashLength-1 {
+		return base
 	}
-	return secretName
+	
+	// Truncate and add hash
+	maxBaseLength := maxLength - hashLength - 1 // -1 for hyphen
+	truncated := base[:maxBaseLength]
+	
+	// Generate hash of full name for uniqueness
+	hash := sha256.Sum256([]byte(base))
+	hashSuffix := hex.EncodeToString(hash[:4]) // Use first 4 bytes = 8 hex chars
+	
+	return fmt.Sprintf("%s-%s", truncated, hashSuffix)
 }
 
 // PodHandler handles mutating admission webhook requests for Pods

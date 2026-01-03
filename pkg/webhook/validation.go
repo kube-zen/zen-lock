@@ -32,11 +32,29 @@ const (
 
 // ValidateInjectAnnotation validates the zen-lock/inject annotation value
 func ValidateInjectAnnotation(injectName string) error {
-	// Use zen-sdk validation for Kubernetes resource name validation
-	if err := sdkvalidation.ValidateResourceName(injectName, sdkvalidation.MaxAnnotationValueLength); err != nil {
-		return fmt.Errorf("inject annotation value: %w", err)
+	// Kubernetes annotation values must be valid DNS subdomain names
+	// Max length: 253 characters (same as resource names)
+	const maxLength = 253
+	
+	if injectName == "" {
+		return fmt.Errorf("inject annotation value cannot be empty")
 	}
-
+	
+	if len(injectName) > maxLength {
+		return fmt.Errorf("inject annotation value exceeds maximum length of %d", maxLength)
+	}
+	
+	// Must match DNS subdomain pattern: [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+	// But we allow uppercase for resource names
+	dnsSubdomainPattern := `^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?)*$`
+	matched, err := regexp.MatchString(dnsSubdomainPattern, injectName)
+	if err != nil {
+		return fmt.Errorf("failed to validate inject annotation value: %w", err)
+	}
+	if !matched {
+		return fmt.Errorf("inject annotation value must be a valid DNS subdomain name")
+	}
+	
 	return nil
 }
 
