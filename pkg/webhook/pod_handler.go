@@ -96,6 +96,64 @@ func NewPodHandler(client client.Client, scheme *runtime.Scheme) (*PodHandler, e
 	}, nil
 }
 
+// getWebhookTimeout returns the configured webhook timeout
+func getWebhookTimeout() time.Duration {
+	webhookTimeout := config.DefaultWebhookTimeout
+	if timeoutStr := os.Getenv("ZEN_LOCK_WEBHOOK_TIMEOUT"); timeoutStr != "" {
+		if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
+			webhookTimeout = parsedTimeout
+		}
+	}
+	return webhookTimeout
+}
+
+// validateInjectionRequest validates the injection annotation and mount path
+func (h *PodHandler) validateInjectionRequest(pod *corev1.Pod, injectName, mountPath string, startTime time.Time, namespace string) admission.Response {
+	// Validate inject annotation
+	if err := ValidateInjectAnnotation(injectName); err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(namespace, injectName, "error", duration)
+		metrics.RecordValidationFailure(namespace, "invalid_inject_annotation")
+		return admission.Denied(fmt.Sprintf("invalid inject annotation: %v", err))
+	}
+
+	// Validate mount path if provided
+	if mountPath != "" {
+		if err := ValidateMountPath(mountPath); err != nil {
+			duration := time.Since(startTime).Seconds()
+			metrics.RecordWebhookInjection(namespace, injectName, "error", duration)
+			metrics.RecordValidationFailure(namespace, "invalid_mount_path")
+			return admission.Denied(fmt.Sprintf("invalid mount path: %v", err))
+		}
+	}
+
+	return admission.Response{} // Valid
+}
+
+// fetchZenLock fetches the ZenLock CRD with caching
+func (h *PodHandler) fetchZenLock(ctx context.Context, zenlockKey types.NamespacedName, namespace, injectName string, startTime time.Time) (*securityv1alpha1.ZenLock, admission.Response) {
+	// Try cache first
+	zenlock, cacheHit := h.cache.Get(zenlockKey)
+	if cacheHit {
+		metrics.RecordCacheHit(namespace, injectName)
+		return zenlock, admission.Response{}
+	}
+
+	metrics.RecordCacheMiss(namespace, injectName)
+	// Fetch from API server
+	zenlock = &securityv1alpha1.ZenLock{}
+	if err := h.Client.Get(ctx, zenlockKey, zenlock); err != nil {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(namespace, injectName, "error", duration)
+		// Sanitize error to prevent information leakage
+		sanitizedErr := SanitizeError(err, "fetch ZenLock")
+		return nil, admission.Errored(http.StatusInternalServerError, sanitizedErr)
+	}
+	// Cache the result
+	h.cache.Set(zenlockKey, zenlock)
+	return zenlock, admission.Response{}
+}
+
 // handleDryRun handles dry-run mode by mutating the pod without creating secrets
 func (h *PodHandler) handleDryRun(ctx context.Context, pod *corev1.Pod, secretName, mountPath, injectName, namespace string, startTime time.Time, originalObject []byte) admission.Response {
 	mutatedPod := pod.DeepCopy()
@@ -195,13 +253,7 @@ func (h *PodHandler) secretDataMatches(existing, expected map[string][]byte) boo
 // Handle processes admission requests
 func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	// Add timeout to context (configurable via ZEN_LOCK_WEBHOOK_TIMEOUT env var)
-	webhookTimeout := config.DefaultWebhookTimeout
-	if timeoutStr := os.Getenv("ZEN_LOCK_WEBHOOK_TIMEOUT"); timeoutStr != "" {
-		if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
-			webhookTimeout = parsedTimeout
-		}
-	}
-	ctx, cancel := context.WithTimeout(ctx, webhookTimeout)
+	ctx, cancel := context.WithTimeout(ctx, getWebhookTimeout())
 	defer cancel()
 
 	startTime := time.Now()
@@ -222,26 +274,15 @@ func (h *PodHandler) Handle(ctx context.Context, req admission.Request) admissio
 		return admission.Allowed("no zen-lock injection requested")
 	}
 
-	// Validate inject annotation
-	if err := ValidateInjectAnnotation(injectName); err != nil {
-		duration := time.Since(startTime).Seconds()
-		metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-		metrics.RecordValidationFailure(req.Namespace, "invalid_inject_annotation")
-		return admission.Denied(fmt.Sprintf("invalid inject annotation: %v", err))
-	}
-
 	// Get mount path from annotation or use default
 	mountPath := pod.GetAnnotations()[config.AnnotationMountPath]
 	if mountPath == "" {
 		mountPath = config.DefaultMountPath
-	} else {
-		// Validate mount path if provided
-		if err := ValidateMountPath(mountPath); err != nil {
-			duration := time.Since(startTime).Seconds()
-			metrics.RecordWebhookInjection(req.Namespace, injectName, "error", duration)
-			metrics.RecordValidationFailure(req.Namespace, "invalid_mount_path")
-			return admission.Denied(fmt.Sprintf("invalid mount path: %v", err))
-		}
+	}
+
+	// Validate injection request
+	if resp := h.validateInjectionRequest(pod, injectName, mountPath, startTime, req.Namespace); resp.Result != nil {
+		return resp
 	}
 
 	// Fetch ZenLock CRD (with caching)
