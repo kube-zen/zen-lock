@@ -225,4 +225,3 @@ func TestPodHandler_ValidateAllowedSubjects_EmptyList(t *testing.T) {
 		t.Error("validateAllowedSubjects() should return error when allowedSubjects is empty")
 	}
 }
-
