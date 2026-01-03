@@ -35,8 +35,9 @@ func TestGenerateSecretName(t *testing.T) {
 			namespace: "default",
 			podName:   "my-pod",
 			validate: func(t *testing.T, secretName string) {
-				if !strings.HasPrefix(secretName, "zen-lock-inject-default-my-pod-") {
-					t.Errorf("Expected prefix 'zen-lock-inject-default-my-pod-', got %s", secretName)
+				expected := "zen-lock-inject-default-my-pod"
+				if secretName != expected {
+					t.Errorf("Expected '%s', got %s", expected, secretName)
 				}
 				if len(secretName) > 253 {
 					t.Errorf("Secret name exceeds 253 chars: %d", len(secretName))
@@ -48,8 +49,9 @@ func TestGenerateSecretName(t *testing.T) {
 			namespace: "ns",
 			podName:   "pod",
 			validate: func(t *testing.T, secretName string) {
-				if !strings.HasPrefix(secretName, "zen-lock-inject-ns-pod-") {
-					t.Errorf("Expected prefix 'zen-lock-inject-ns-pod-', got %s", secretName)
+				expected := "zen-lock-inject-ns-pod"
+				if secretName != expected {
+					t.Errorf("Expected '%s', got %s", expected, secretName)
 				}
 			},
 		},
@@ -61,9 +63,10 @@ func TestGenerateSecretName(t *testing.T) {
 				if len(secretName) > 253 {
 					t.Errorf("Secret name exceeds 253 chars: %d", len(secretName))
 				}
-				// Should preserve hash suffix
-				hash := sha256.Sum256([]byte("zen-lock-inject-" + strings.Repeat("a", 100) + "-" + strings.Repeat("b", 100)))
-				hashStr := hex.EncodeToString(hash[:])[:16]
+				// Should have hash suffix when truncated
+				base := "zen-lock-inject-" + strings.Repeat("a", 100) + "-" + strings.Repeat("b", 100)
+				hash := sha256.Sum256([]byte(base))
+				hashStr := hex.EncodeToString(hash[:4]) // 8 hex chars
 				if !strings.HasSuffix(secretName, hashStr) {
 					t.Errorf("Expected hash suffix %s, got %s", hashStr, secretName)
 				}
@@ -77,9 +80,10 @@ func TestGenerateSecretName(t *testing.T) {
 				if len(secretName) > 253 {
 					t.Errorf("Secret name exceeds 253 chars: %d", len(secretName))
 				}
-				// Should preserve hash suffix
-				hash := sha256.Sum256([]byte("zen-lock-inject-" + strings.Repeat("a", 200) + "-" + strings.Repeat("b", 200)))
-				hashStr := hex.EncodeToString(hash[:])[:16]
+				// Should have hash suffix when truncated
+				base := "zen-lock-inject-" + strings.Repeat("a", 200) + "-" + strings.Repeat("b", 200)
+				hash := sha256.Sum256([]byte(base))
+				hashStr := hex.EncodeToString(hash[:4]) // 8 hex chars
 				if !strings.HasSuffix(secretName, hashStr) {
 					t.Errorf("Expected hash suffix %s, got %s", hashStr, secretName)
 				}

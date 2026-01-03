@@ -177,6 +177,11 @@ func (h *PodHandler) handleDryRun(ctx context.Context, pod *corev1.Pod, secretNa
 
 // ensureSecretExists ensures the secret exists and is up-to-date, handling conflicts and stale data
 func (h *PodHandler) ensureSecretExists(ctx context.Context, secret *corev1.Secret, secretName, injectName, namespace, podName string, secretData map[string][]byte, startTime time.Time, retryConfig retry.Config, isDryRun bool) error {
+	// Skip secret creation/update in dry-run mode
+	if isDryRun {
+		return nil
+	}
+
 	createErr := retry.Do(ctx, retryConfig, func() error {
 		return h.Client.Create(ctx, secret)
 	})

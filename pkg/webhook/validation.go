@@ -33,18 +33,18 @@ func ValidateInjectAnnotation(injectName string) error {
 	// Kubernetes annotation values must be valid DNS subdomain names
 	// Max length: 253 characters (same as resource names)
 	const maxLength = 253
-	
+
 	if injectName == "" {
 		return fmt.Errorf("inject annotation value cannot be empty")
 	}
-	
+
 	if len(injectName) > maxLength {
 		return fmt.Errorf("inject annotation value exceeds maximum length of %d", maxLength)
 	}
-	
+
 	// Must match DNS subdomain pattern: [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
-	// But we allow uppercase for resource names
-	dnsSubdomainPattern := `^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?)*$`
+	// Kubernetes resource names must be lowercase
+	dnsSubdomainPattern := `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
 	matched, err := regexp.MatchString(dnsSubdomainPattern, injectName)
 	if err != nil {
 		return fmt.Errorf("failed to validate inject annotation value: %w", err)
@@ -52,7 +52,7 @@ func ValidateInjectAnnotation(injectName string) error {
 	if !matched {
 		return fmt.Errorf("inject annotation value must be a valid DNS subdomain name")
 	}
-	
+
 	return nil
 }
 

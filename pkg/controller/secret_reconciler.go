@@ -17,6 +17,7 @@ import (
 
 	"github.com/kube-zen/zen-lock/pkg/common"
 	"github.com/kube-zen/zen-lock/pkg/config"
+	sdkmetadata "github.com/kube-zen/zen-sdk/pkg/k8s/metadata"
 	"github.com/kube-zen/zen-sdk/pkg/retry"
 )
 
@@ -111,18 +112,12 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: config.RequeueDelayPodNoUID}, nil
 	}
 
-	// Create OwnerReference
-	controller := true
-	ownerRef := metav1.OwnerReference{
-		APIVersion: "v1",
-		Kind:       "Pod",
-		Name:       pod.Name,
-		UID:        pod.UID,
-		Controller: &controller,
+	// Set owner reference using zen-sdk/pkg/k8s/metadata
+	// This ensures proper scheme handling and garbage collection
+	if err := sdkmetadata.SetOwnerReference(pod, secret, r.Scheme); err != nil {
+		logger.Error(err, "Failed to set owner reference on Secret", "secret", req.NamespacedName, "pod", podKey)
+		return ctrl.Result{}, fmt.Errorf("failed to set owner reference: %w", err)
 	}
-
-	// Update Secret with OwnerReference (with retry for conflict errors)
-	secret.OwnerReferences = []metav1.OwnerReference{ownerRef}
 	retryConfig := retry.DefaultConfig()
 	retryConfig.MaxAttempts = config.DefaultRetryMaxAttempts
 	retryConfig.InitialDelay = config.DefaultRetryInitialDelay

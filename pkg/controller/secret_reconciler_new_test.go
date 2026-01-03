@@ -103,4 +103,3 @@ func TestNewSecretReconciler_InvalidOrphanTTL(t *testing.T) {
 		t.Errorf("Expected OrphanTTL to fall back to default %v, got %v", DefaultOrphanTTL, reconciler.OrphanTTL)
 	}
 }
-

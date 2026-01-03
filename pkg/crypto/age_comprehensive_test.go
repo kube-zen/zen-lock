@@ -111,7 +111,6 @@ func TestAgeEncryptor_Decrypt_WrongKey(t *testing.T) {
 	}
 }
 
-
 func TestAgeEncryptor_DecryptMap_Success(t *testing.T) {
 	encryptor := NewAgeEncryptor()
 	privateKey, publicKey := generateTestKeyPair(t)
@@ -153,7 +152,6 @@ func TestAgeEncryptor_DecryptMap_Success(t *testing.T) {
 		t.Errorf("key2: got %s, want %s", string(result["key2"]), string(plaintext2))
 	}
 }
-
 
 func TestAgeEncryptor_EncryptDecrypt_RoundTrip(t *testing.T) {
 	encryptor := NewAgeEncryptor()
@@ -266,4 +264,3 @@ func TestAgeEncryptor_DecryptMap_MultipleKeys(t *testing.T) {
 		}
 	}
 }
-

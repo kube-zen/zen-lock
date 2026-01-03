@@ -18,16 +18,21 @@ package controller
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	securityv1alpha1 "github.com/kube-zen/zen-lock/pkg/apis/security.kube-zen.io/v1alpha1"
 	"github.com/kube-zen/zen-lock/pkg/common"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func TestZenLockReconciler_UpdateStatus_NewCondition(t *testing.T) {
@@ -226,6 +231,17 @@ func TestZenLockReconciler_UpdateStatus_StatusChange(t *testing.T) {
 }
 
 func TestZenLockReconciler_Reconcile_PrivateKeyReload(t *testing.T) {
+	// Save and clear environment variable
+	originalKey := os.Getenv("ZEN_LOCK_PRIVATE_KEY")
+	defer func() {
+		if originalKey != "" {
+			os.Setenv("ZEN_LOCK_PRIVATE_KEY", originalKey)
+		} else {
+			os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+		}
+	}()
+	os.Unsetenv("ZEN_LOCK_PRIVATE_KEY")
+
 	reconciler, clientBuilder := setupTestReconciler(t)
 
 	// Clear private key to test reload path

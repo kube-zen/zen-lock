@@ -33,8 +33,8 @@ func TestZenLockReconciler_Reconcile_DecryptionFailure(t *testing.T) {
 	// Create ZenLock with invalid encrypted data (will fail decryption)
 	zenlock := &securityv1alpha1.ZenLock{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-zenlock",
-			Namespace: "default",
+			Name:       "test-zenlock",
+			Namespace:  "default",
 			Finalizers: []string{"zenlocks.security.kube-zen.io/finalizer"},
 		},
 		Spec: securityv1alpha1.ZenLockSpec{
@@ -121,4 +121,3 @@ func TestZenLockReconciler_Reconcile_UpdateFinalizerError(t *testing.T) {
 
 // TestZenLockReconciler_Reconcile_NotFound is defined in reconciler_test.go
 // This test file focuses on decryption-specific scenarios
-
