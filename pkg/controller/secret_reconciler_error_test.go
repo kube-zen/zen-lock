@@ -33,10 +33,14 @@ import (
 func TestSecretReconciler_Reconcile_GetPodError(t *testing.T) {
 	reconciler, clientBuilder := setupSecretReconciler(t)
 
+	// Create a recent secret (not old enough to be deleted as orphaned)
+	// This ensures it will requeue instead of deleting
+	recentTime := metav1.NewTime(time.Now().Add(-1 * time.Minute))
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "zen-lock-secret",
-			Namespace: "default",
+			Name:              "zen-lock-secret",
+			Namespace:         "default",
+			CreationTimestamp: recentTime,
 			Labels: map[string]string{
 				common.LabelPodName:      "test-pod",
 				common.LabelPodNamespace: "default",
