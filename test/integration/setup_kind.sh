@@ -68,11 +68,21 @@ create_cluster() {
             exit 1
         }
         
-        # Export kubeconfig
-        k3d kubeconfig write "$CLUSTER_NAME" > "$KUBECONFIG_PATH" || {
-            log_error "Failed to export kubeconfig"
-            exit 1
-        }
+        # k3d writes kubeconfig automatically, we just need to copy it
+        # k3d stores kubeconfig in ~/.config/k3d/kubeconfig-${CLUSTER_NAME}.yaml
+        local k3d_kubeconfig="${HOME}/.config/k3d/kubeconfig-${CLUSTER_NAME}.yaml"
+        if [ -f "$k3d_kubeconfig" ]; then
+            cp "$k3d_kubeconfig" "$KUBECONFIG_PATH" || {
+                log_error "Failed to copy kubeconfig"
+                exit 1
+            }
+        else
+            # Fallback: write it explicitly
+            k3d kubeconfig write "$CLUSTER_NAME" > "$KUBECONFIG_PATH" || {
+                log_error "Failed to export kubeconfig"
+                exit 1
+            }
+        fi
         
         log_info "k3d cluster created: $CLUSTER_NAME"
         return 0
@@ -113,7 +123,20 @@ export_kubeconfig() {
     log_info "Exporting kubeconfig..."
     
     if [ "$CLUSTER_TYPE" = "k3d" ]; then
-        # k3d already exported kubeconfig in create_cluster
+        # k3d writes kubeconfig automatically, we just need to copy it
+        local k3d_kubeconfig="${HOME}/.config/k3d/kubeconfig-${CLUSTER_NAME}.yaml"
+        if [ -f "$k3d_kubeconfig" ]; then
+            cp "$k3d_kubeconfig" "$KUBECONFIG_PATH" || {
+                log_error "Failed to copy kubeconfig"
+                exit 1
+            }
+        else
+            # Fallback: write it explicitly
+            k3d kubeconfig write "$CLUSTER_NAME" > "$KUBECONFIG_PATH" || {
+                log_error "Failed to export kubeconfig"
+                exit 1
+            }
+        fi
         log_info "Kubeconfig exported to: $KUBECONFIG_PATH"
     else
         kind get kubeconfig --name "$CLUSTER_NAME" > "$KUBECONFIG_PATH"
