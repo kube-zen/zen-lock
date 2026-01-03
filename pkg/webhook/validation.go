@@ -21,8 +21,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	sdkvalidation "github.com/kube-zen/zen-sdk/pkg/k8s/validation"
 )
 
 const (
