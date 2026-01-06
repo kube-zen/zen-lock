@@ -1,5 +1,10 @@
 # zen-lock
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
+[![CI](https://github.com/kube-zen/zen-lock/workflows/CI/badge.svg)](https://github.com/kube-zen/zen-lock/actions)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.26+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+
 Kubernetes-native secret manager with Zero-Knowledge encryption for GitOps workflows.
 
 ## Overview
