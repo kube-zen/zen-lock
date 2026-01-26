@@ -108,6 +108,7 @@ func getWebhookTimeout() time.Duration {
 }
 
 // validateInjectionRequest validates the injection annotation and mount path
+// SECURITY: Ensures zen-lock injector is deployed if annotations are present
 func (h *PodHandler) validateInjectionRequest(pod *corev1.Pod, injectName, mountPath string, startTime time.Time, namespace string) admission.Response {
 	// Validate inject annotation
 	if err := ValidateInjectAnnotation(injectName); err != nil {
@@ -125,6 +126,18 @@ func (h *PodHandler) validateInjectionRequest(pod *corev1.Pod, injectName, mount
 			metrics.RecordValidationFailure(namespace, "invalid_mount_path")
 			return admission.Denied(fmt.Sprintf("invalid mount path: %v", err))
 		}
+	}
+
+	// SECURITY: Validate that zen-lock injector is available
+	// If annotation is present, the webhook must be able to process it
+	// This check ensures the webhook is deployed and operational
+	// Note: The webhook itself being called is proof it's deployed, but we validate
+	// that the private key is configured (required for decryption)
+	if h.privateKey == "" {
+		duration := time.Since(startTime).Seconds()
+		metrics.RecordWebhookInjection(namespace, injectName, "error", duration)
+		metrics.RecordValidationFailure(namespace, "injector_not_configured")
+		return admission.Denied(fmt.Sprintf("zen-lock injector not properly configured: ZEN_LOCK_PRIVATE_KEY not set. Pod annotation 'zen-lock/inject=%s' requires zen-lock webhook to be deployed and configured", injectName))
 	}
 
 	return admission.Response{} // Valid
